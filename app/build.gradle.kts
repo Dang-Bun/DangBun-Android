@@ -2,6 +2,13 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+
+    // 🔥 ktlint 적용
+    id("org.jlleitschuh.gradle.ktlint")
+}
+ktlint {
+    android.set(true)
+    ignoreFailures.set(false)
 }
 
 android {
