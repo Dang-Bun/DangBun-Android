@@ -1,0 +1,78 @@
+# -----------------------------------------
+# Android / Kotlin / Gradle 기본 제외 항목
+# -----------------------------------------
+
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Android Studio
+.idea/
+*.iml
+
+# Local configuration
+local.properties
+
+# Log files
+*.log
+*.tmp
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Kotlin
+*.kts~
+
+# -----------------------------------------
+# App Signing / Security
+# -----------------------------------------
+
+# Keystore files
+*.jks
+*.keystore
+
+# -----------------------------------------
+# Google, Firebase
+# -----------------------------------------
+
+# Google Services
+google-services.json
+app/google-services.json
+
+# Firebase Crashlytics
+crashlytics-build.properties
+
+# -----------------------------------------
+# Android Capture & Profiling
+# -----------------------------------------
+
+captures/
+outputs/
+
+# -----------------------------------------
+# Jetpack Compose
+# (특별한 제외 항목은 없지만 build cache는 기본적으로 제외)
+# -----------------------------------------
+
+# -----------------------------------------
+# Packaging
+# -----------------------------------------
+
+*.apk
+*.aar
+*.ap_
+
+# -----------------------------------------
+# IntelliJ / JetBrains
+# -----------------------------------------
+
+out/
+
+# -----------------------------------------
+# Gradle Wrapper (선택적으로 제외 가능)
+# 주의: 삭제하면 빌드 환경 통일이 어려워져서 보통 유지함
+# gradle/wrapper/gradle-wrapper.properties
+# gradle/wrapper/gradle-wrapper.jar
+# -----------------------------------------
