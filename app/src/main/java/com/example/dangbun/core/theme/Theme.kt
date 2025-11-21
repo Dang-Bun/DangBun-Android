@@ -40,7 +40,7 @@ fun dangbunTheme(
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = MaterialTheme.typography, // (Compose 기본은 사용 안함)
+            typography = MaterialTheme.typography,
             content = content
         )
     }

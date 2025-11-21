@@ -36,27 +36,27 @@ val defaultDangbunTypography = DangbunTypography(
     title_SB_24 = TextStyle(
         fontFamily = DangbunFontSemiBold,
         fontSize = 24.sp,
-        lineHeight = 34.sp
+        lineHeight = 34.sp,
     ),
     title_M_20 = TextStyle(
         fontFamily = DangbunFontMedium,
         fontSize = 20.sp,
-        lineHeight = 30.sp
+        lineHeight = 30.sp,
     ),
     body_R_16 = TextStyle(
         fontFamily = DangbunFontRegular,
         fontSize = 16.sp,
-        lineHeight = 24.sp
+        lineHeight = 24.sp,
     ),
     body_R_14 = TextStyle(
         fontFamily = DangbunFontRegular,
         fontSize = 14.sp,
-        lineHeight = 20.sp
+        lineHeight = 20.sp,
     ),
     caption_R_12 = TextStyle(
         fontFamily = DangbunFontRegular,
         fontSize = 12.sp,
-        lineHeight = 16.sp
+        lineHeight = 16.sp,
     ),
 )
 

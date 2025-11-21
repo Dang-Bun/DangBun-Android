@@ -25,7 +25,7 @@ fun ThemePreviewTest() {
 
 @Preview(showBackground = true)
 @Composable
-fun PreviewDangbunTheme() {
+fun previewDangbunTheme() {
     dangbunTheme {
         ThemePreviewTest()
     }
