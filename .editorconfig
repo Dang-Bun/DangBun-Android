@@ -1,0 +1,47 @@
+# ============================================================
+# Dangbun Android – KtLint / IntelliJ Formatting Rule Set
+# 원하는 규칙만 남기고 모두 비활성화한 최소 규칙 버전
+# ============================================================
+
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+max_line_length = off
+
+# ============================================================
+# KTLINT RULE OVERRIDES
+# ============================================================
+
+# ---- Enabled Rules ----
+# ✔ trailing comma
+# ✔ multiline expression
+
+ktlint_standard_trailing-comma = enabled
+ktlint_standard_multiline-expression = enabled
+
+# ---- Disabled Rules ----
+# (너가 끄고 싶다고 한 나머지 전부 OFF)
+
+ktlint_standard_no-wildcard-imports = disabled
+ktlint_standard_filename = disabled
+ktlint_standard_function-naming = disabled
+ktlint_standard_property-naming = disabled
+ktlint_standard_class-naming = disabled
+ktlint_standard_annotation = disabled
+ktlint_standard_backing-property = disabled
+ktlint_standard_import-ordering = disabled
+ktlint_standard_comment-spacing = disabled
+ktlint_standard_spacing-between-declarations-with-comments = disabled
+ktlint_standard_wrapping = disabled
+ktlint_standard_argument-list-wrapping = disabled
+ktlint_standard_parameter-list-wrapping = disabled
+ktlint_standard_string-template-indent = disabled
+
+# 테스트 파일 제외 규칙 예시(선택)
+[*.kt]
+ktlint_disabled_rules = no-unused-imports
