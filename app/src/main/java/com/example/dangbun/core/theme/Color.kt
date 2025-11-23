@@ -28,13 +28,14 @@ data class DangbunColors(
 // ─────────────────────────────────────────────
 // 기본 라이트 모드 컬러 세트
 // ─────────────────────────────────────────────
-val defaultDangbunColors = DangbunColors(
-    bluePrimary = BluePrimary,
-    purple = Purple,
-    mint = Mint,
-    grayLight = GrayLight,
-    grayBackground = Graybackground,
-)
+val defaultDangbunColors =
+    DangbunColors(
+        bluePrimary = BluePrimary,
+        purple = Purple,
+        mint = Mint,
+        grayLight = GrayLight,
+        grayBackground = Graybackground,
+    )
 
 // ─────────────────────────────────────────────
 // CompositionLocal Provider
