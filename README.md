@@ -1,4 +1,38 @@
-# Dangbun Android
+# 🧑‍💼 당번 (DangBun) - Android
 
-(테스트용 커밋)
-docs: trigger ci
+**KUIT (Konkuk Univ. IT Club)** 에서 제작한 **당번 자동화 서비스(Android 앱)** 입니다.  
+모임 내 역할 분담(당번 지정)을 **자동으로 공정하게 배정**합니다.
+
+---
+
+## 🚀 프로젝트 소개
+- **당번 자동화 시스템**: 매번 수동으로 정하던 당번을 자동으로 공정하게 배정합니다.
+- **사용자 중심 UI/UX**: 몇 번의 터치로 당번을 설정하고 확인할 수 있습니다.
+- **간편한 설정**: 팀원 목록과 빈도만 입력하면 당번이 자동으로 지정됩니다.
+
+---
+
+## 🛠 기술 스택 (Android)
+
+| 분야 | 기술 |
+|---|---|
+| Language | Kotlin |
+| UI | Jetpack Compose (Material 3) ✅ |
+| Architecture | Clean Architecture + MVVM ✅ |
+| DI | Hilt ✅ |
+| Async | Kotlin Coroutines / Flow |
+| Network | Retrofit / OkHttp ✅ |
+| Local Storage | Room / DataStore ✅ |
+| Image | Coil ✅ |
+| Dev Tools | Android Studio, Git, GitHub |
+| Code Quality | ktlint / detekt ✅ |
+
+---
+
+## 📦 주요 기능 (MVP)
+- ✅ 당번 그룹 생성/관리 (멤버 추가/삭제)
+- ✅ 당번 배정 (랜덤/순번/규칙 기반 로테이션 등)
+- ✅ 배정 히스토리 조회
+- ✅ 예외 처리 (휴가/패스/교체 등)
+
+---
