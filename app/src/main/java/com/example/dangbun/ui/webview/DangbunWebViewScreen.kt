@@ -8,9 +8,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun DangbunWebViewScreen(
-    url: String = "https://dangbun-frontend-virid.vercel.app/"
-) {
+fun DangbunWebViewScreen(url: String = "https://dangbun-frontend-virid.vercel.app/") {
     AndroidView(
         factory = { context ->
             WebView(context).apply {
@@ -20,6 +18,6 @@ fun DangbunWebViewScreen(
                 webViewClient = WebViewClient()
                 loadUrl(url)
             }
-        }
+        },
     )
 }
