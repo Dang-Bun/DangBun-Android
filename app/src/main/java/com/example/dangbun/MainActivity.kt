@@ -15,7 +15,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            DangbunWebViewScreen()
+            DangbunWebViewScreen(onClose = { finish() })
         }
     }
 }
@@ -34,5 +34,5 @@ fun greeting(
 @Preview(showBackground = true)
 @Composable
 fun greetingPreview() {
-    DangbunWebViewScreen()
+    DangbunWebViewScreen(onClose = { })
 }
