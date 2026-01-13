@@ -18,24 +18,70 @@ fun DangbunWebViewScreen(
     url: String = "https://dangbun-frontend-virid.vercel.app/",
     onClose: () -> Unit,
 ) {
-    // 환경 객체 가져오기
     val context = LocalContext.current
 
-    // WebView에 대한 기록 남겨두도록
     val webView =
         remember {
             WebView(context).apply {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
+
+                // 화면에 맞게 보여주기(기본 확대/축소 보정)
+                settings.useWideViewPort = true
+                settings.loadWithOverviewMode = true
+
+                // 줌 허용(선택)
+                settings.setSupportZoom(true)
+                settings.builtInZoomControls = true
+                settings.displayZoomControls = false
+
                 webViewClient =
                     object : WebViewClient() {
+
                         override fun shouldOverrideUrlLoading(
                             view: WebView,
                             url: String,
                         ): Boolean {
                             return handleUrl(context, url)
                         }
+
+                        override fun onPageFinished(view: WebView, url: String) {
+                            super.onPageFinished(view, url)
+
+                            // ✅ 모바일 viewport 강제 + 좌우 클리핑 완화
+                            val js =
+                                """
+                                (function() {
+                                  // 1) meta viewport 없으면 만들고, 있으면 덮어쓰기
+                                  var meta = document.querySelector('meta[name="viewport"]');
+                                  if (!meta) {
+                                    meta = document.createElement('meta');
+                                    meta.name = 'viewport';
+                                    document.head.appendChild(meta);
+                                  }
+                                  meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+
+                                  // 2) 문서 폭을 화면에 맞추도록 보정 (좌우 잘림 완화)
+                                  document.documentElement.style.width = '100%';
+                                  document.body.style.width = '100%';
+                                  document.body.style.margin = '0';
+                                  document.body.style.overflowX = 'hidden';
+
+                                  // 3) 너무 큰 고정폭 요소가 있으면 화면 밖으로 나가지 않게
+                                  var style = document.getElementById('__wv_fix__');
+                                  if (!style) {
+                                    style = document.createElement('style');
+                                    style.id = '__wv_fix__';
+                                    style.innerHTML = '*{max-width:100vw; box-sizing:border-box;}';
+                                    document.head.appendChild(style);
+                                  }
+                                })();
+                                """.trimIndent()
+
+                            view.evaluateJavascript(js, null)
+                        }
                     }
+
                 loadUrl(url)
             }
         }
@@ -44,7 +90,6 @@ fun DangbunWebViewScreen(
         if (webView.canGoBack()) {
             webView.goBack()
         } else {
-            // 뒤로 갈 페이지가 없으면 WebView 화면을 닫는 동작을 실행
             onClose()
         }
     }
@@ -58,18 +103,16 @@ private fun handleUrl(
     context: android.content.Context,
     url: String,
 ): Boolean {
-    // http/https는 WebView가 계속 로드하도록 false
+
     if (url.startsWith("http://") || url.startsWith("https://")) {
         return false
     }
 
-    // 그 외 스킴(tel:, mailto:, intent: 등)은 외부 앱으로 위임
     return try {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
         context.startActivity(intent)
         true
     } catch (e: ActivityNotFoundException) {
-        // 처리할 앱이 없다면 WebView가 처리하도록 넘김(또는 true로 막기)
         false
     }
 }
