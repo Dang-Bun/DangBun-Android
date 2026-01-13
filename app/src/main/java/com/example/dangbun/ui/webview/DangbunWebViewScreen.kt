@@ -103,6 +103,7 @@ private fun handleUrl(
     context: android.content.Context,
     url: String,
 ): Boolean {
+
     if (url.startsWith("http://") || url.startsWith("https://")) {
         return false
     }
