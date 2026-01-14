@@ -135,6 +135,9 @@ fun DangbunWebViewScreen(
                         null
                     )
 
+                    // ✅ 팝업(모달) 중앙정렬 고정 (위로 붙는 현상 방지)
+                    injectCommonFixes(view)
+
                     // ✅ 스플래시인지 판단해서:
                     // 1) 0.8 배율 강제(zoomBy)
                     // 2) 스플래시 중앙정렬(로고 블록을 fixed-center)
@@ -159,6 +162,8 @@ fun DangbunWebViewScreen(
                     if (url.contains("kakao.com", ignoreCase = true)) {
                         injectKakaoLtrFix(view)
                     }
+
+                    injectMyPlaceTopInsetFix(view)
                 }
 
                 override fun onReceivedError(
@@ -237,6 +242,100 @@ private fun handleUrl(
     }
 }
 
+/**
+ * ✅ 팝업(모달) 중앙 정렬 + 위로 붙는 현상 방지 (최소 패치)
+ * - 전역 padding-top / appbar 이동 같은 부작용 로직 제거
+ * - role=dialog / aria-modal 기반 중앙 고정 + overlay flex 중앙만 적용
+ * - 중복 주입/로그 폭발 방지: window flag로 1회만 적용
+ */
+private fun injectCommonFixes(view: WebView) {
+    val js = """
+        (function() {
+          try {
+            // ✅ 한 번만 적용(중복 주입/로그 폭발 방지)
+            if (window.__dangbun_modal_center_once__) return;
+            window.__dangbun_modal_center_once__ = true;
+
+            // ✅ viewport는 기존 목적대로 유지
+            var meta = document.querySelector('meta[name="viewport"]');
+            if (!meta) {
+              meta = document.createElement('meta');
+              meta.name = 'viewport';
+              document.head.appendChild(meta);
+            }
+            meta.content = 'width=device-width, initial-scale=0.8, maximum-scale=1.0, user-scalable=no';
+
+            // ✅ 가로 넘침 방지
+            document.documentElement.style.width = '100%';
+            document.body.style.width = '100%';
+            document.body.style.margin = '0';
+            document.body.style.overflowX = 'hidden';
+
+            // ✅ 모달 중앙 정렬 CSS
+            var style = document.getElementById('__dangbun_modal_center_fix__');
+            if (!style) {
+              style = document.createElement('style');
+              style.id = '__dangbun_modal_center_fix__';
+              style.innerHTML = `
+                * { box-sizing: border-box; max-width: 100vw; }
+
+                /* ✅ dialog 자체를 중앙 고정 */
+                [role="dialog"], [aria-modal="true"] {
+                  position: fixed !important;
+                  top: 50% !important;
+                  left: 50% !important;
+                  transform: translate(-50%, -50%) !important;
+                  margin: 0 !important;
+                  max-width: calc(100vw - 32px) !important;
+                  max-height: calc(100vh - 32px) !important;
+                }
+
+                /* ✅ overlay/wrap이 flex면 중앙으로 (위로 붙는 원인 제거) */
+                .MuiDialog-container,
+                .MuiModal-root,
+                .ant-modal-wrap,
+                .swal2-container,
+                .ReactModal__Overlay,
+                [data-overlay="true"],
+                [class*="overlay"],
+                [class*="Overlay"],
+                [class*="modal"],
+                [class*="Modal"] {
+                  align-items: center !important;
+                  justify-content: center !important;
+                }
+              `;
+              document.head.appendChild(style);
+            }
+
+            // ✅ 늦게 생성되는 다이얼로그도 중앙 보정
+            if (!window.__dangbun_modal_center_ob__) {
+              window.__dangbun_modal_center_ob__ = new MutationObserver(function() {
+                try {
+                  var dialogs = document.querySelectorAll('[role="dialog"], [aria-modal="true"]');
+                  dialogs.forEach(function(el) {
+                    el.style.position = 'fixed';
+                    el.style.top = '50%';
+                    el.style.left = '50%';
+                    el.style.transform = 'translate(-50%, -50%)';
+                    el.style.margin = '0';
+                    el.style.maxWidth = 'calc(100vw - 32px)';
+                    el.style.maxHeight = 'calc(100vh - 32px)';
+                  });
+                } catch(e) {}
+              });
+              window.__dangbun_modal_center_ob__.observe(document.documentElement, { childList: true, subtree: true });
+            }
+
+            console.log('WV_MODAL_CENTER_APPLIED_ONCE', location.pathname);
+
+          } catch (e) {}
+        })();
+    """.trimIndent()
+
+    view.evaluateJavascript(js, null)
+}
+
 private fun injectSplashFix(view: WebView) {
     val js = """
         (function() {
@@ -251,7 +350,6 @@ private fun injectSplashFix(view: WebView) {
                   meta.name = 'viewport';
                   document.head.appendChild(meta);
                 }
-                // ✅ 여기: 질문에서 말한 그 설정 그대로 "강제"
                 meta.content = 'width=device-width, initial-scale=0.8, maximum-scale=1.0, user-scalable=no';
               } catch(e) {}
             }
@@ -281,15 +379,12 @@ private fun injectSplashFix(view: WebView) {
 
               ensureViewportScale();
 
-              // ✅ 실제 화면 높이를 px로도 고정 (0.8 스케일에서 남는 영역 방지)
               var h = window.innerHeight || 0;
               var H = h > 0 ? (h + 'px') : '100vh';
-              
-              // ✅ 배경 확정
+
               document.documentElement.style.background = BG;
               document.body.style.background = BG;
 
-              // ✅ 스크롤 제거
               document.documentElement.style.height = H;
               document.body.style.height = H;
               document.body.style.minHeight = H;
@@ -297,30 +392,27 @@ private fun injectSplashFix(view: WebView) {
               document.body.style.margin = '0';
               document.body.style.overflow = 'hidden';
 
-              // ✅ 핵심: React 루트(#root/#__next/#app)를 화면 중앙 flex로!
               var root = document.querySelector('#root') || document.querySelector('#__next') || document.querySelector('#app');
               var host = root || document.body;
 
-              // ✅ host도 배경 + 높이 확정
-                host.style.backgroundColor = BG;
-                host.style.height = H;
-                host.style.minHeight = H;
+              host.style.backgroundColor = BG;
+              host.style.height = H;
+              host.style.minHeight = H;
 
-                host.style.display = 'flex';
-                host.style.flexDirection = 'column';
-                host.style.justifyContent = 'center';
-                host.style.alignItems = 'center';
+              host.style.display = 'flex';
+              host.style.flexDirection = 'column';
+              host.style.justifyContent = 'center';
+              host.style.alignItems = 'center';
 
-                host.style.width = '100%';
-                host.style.maxWidth = '100vw';
-                host.style.padding = '0';
-                host.style.boxSizing = 'border-box';
-                
-                // ✅ 실제 스플래시 컨텐츠(첫 자식)를 더 강하게 정중앙으로
-                var child = host.firstElementChild;
-                if (child) {
-                  child.style.margin = 'auto';
-                }
+              host.style.width = '100%';
+              host.style.maxWidth = '100vw';
+              host.style.padding = '0';
+              host.style.boxSizing = 'border-box';
+
+              var child = host.firstElementChild;
+              if (child) {
+                child.style.margin = 'auto';
+              }
               console.log('WV_SPLASH_CENTER_APPLIED');
             }
 
@@ -332,20 +424,17 @@ private fun injectSplashFix(view: WebView) {
                 var host2 = main2 || root2;
 
                 if (host2) {
-                  // 필요하면 16~48px 사이로 조절하세요
                   host2.style.paddingTop = '60px';
                   host2.style.boxSizing = 'border-box';
                 }
               } catch(e) {}
-            
+
               if (!window.__dangbun_splash_center_applied__) return;
               window.__dangbun_splash_center_applied__ = false;
 
-              // 배경 원복
               document.documentElement.style.background = '';
               document.body.style.background = '';
 
-              // 루트 스타일 원복
               var root = document.querySelector('#root') || document.querySelector('#__next') || document.querySelector('#app');
               var host = root || document.body;
 
@@ -358,10 +447,10 @@ private fun injectSplashFix(view: WebView) {
               host.style.maxWidth = '';
               host.style.boxSizing = '';
               host.style.backgroundColor = '';
-              
+
               document.body.style.backgroundColor = '';
               document.documentElement.style.backgroundColor = '';
-              
+
               document.body.style.margin = '';
               document.documentElement.style.height = '';
               document.body.style.height = '';
@@ -369,21 +458,17 @@ private fun injectSplashFix(view: WebView) {
             }
 
             function check() {
-              // ✅ 스플래시든 아니든 viewport 0.8은 유지(글씨 잘림 방지 목적)
               ensureViewportScale();
-
               if (isSplash()) applySplashCenter();
               else resetSplashCenter();
             }
 
-            // 최초 + 재시도
             check();
             setTimeout(check, 50);
             setTimeout(check, 150);
             setTimeout(check, 300);
             setTimeout(check, 700);
 
-            // SPA 라우팅/DOM 변화에서도 계속 유지
             if (!window.__dangbun_viewport_hooked__) {
               window.__dangbun_viewport_hooked__ = true;
 
@@ -414,7 +499,6 @@ private fun injectSplashFix(view: WebView) {
     view.evaluateJavascript(js, null)
 }
 
-
 private fun injectKakaoLtrFix(view: WebView) {
     val js = """
         (function() {
@@ -434,6 +518,87 @@ private fun injectKakaoLtrFix(view: WebView) {
               document.head.appendChild(style);
             }
           } catch (e) {}
+        })();
+    """.trimIndent()
+
+    view.evaluateJavascript(js, null)
+}
+
+private fun injectMyPlaceTopInsetFix(view: WebView) {
+    val js = """
+        (function() {
+          try {
+            function isMyPlace() {
+              var href = (location && location.href) ? location.href : '';
+              var path = (location && location.pathname) ? location.pathname : '';
+
+              var hint = /myplace|place|내플레이스|내\s*플레이스/i.test(href) || /myplace|place/i.test(path);
+              if (!hint) return false;
+
+              var nodes = document.querySelectorAll('h1,h2,h3,header,div,span,p');
+              for (var i=0; i<nodes.length; i++) {
+                var t = (nodes[i].innerText || '').trim();
+                if (t === '내 플레이스') return true;
+              }
+              return false;
+            }
+
+            function apply() {
+              if (!isMyPlace()) return;
+
+              var TOP_EXTRA = 28;
+
+              var titleEl = null;
+              var candidates = document.querySelectorAll('h1,h2,h3,header,div,span,p');
+              for (var i=0; i<candidates.length; i++) {
+                var t = (candidates[i].innerText || '').trim();
+                if (t === '내 플레이스') { titleEl = candidates[i]; break; }
+              }
+              if (!titleEl) return;
+
+              var cur = titleEl;
+              var header = null;
+              for (var d=0; d<12 && cur; d++) {
+                var st = window.getComputedStyle(cur);
+                if (st && (st.position === 'fixed' || st.position === 'sticky')) { header = cur; break; }
+                cur = cur.parentElement;
+              }
+
+              if (header) {
+                if (header.__dangbun_myplace_pushed__) return;
+                header.__dangbun_myplace_pushed__ = true;
+
+                header.style.top = 'calc(env(safe-area-inset-top) + ' + TOP_EXTRA + 'px)';
+                header.style.zIndex = '999999';
+
+                var h = header.getBoundingClientRect().height || 0;
+                var pad = Math.ceil(h + TOP_EXTRA + 8);
+
+                var root = document.querySelector('#root') || document.querySelector('#__next') || document.querySelector('#app');
+                var main = document.querySelector('main');
+                var host = main || root || document.body;
+
+                var curPad = parseFloat((window.getComputedStyle(host).paddingTop || '0').replace('px','')) || 0;
+                if (pad > curPad) {
+                  host.style.paddingTop = pad + 'px';
+                  host.style.boxSizing = 'border-box';
+                }
+              } else {
+                titleEl.style.marginTop = 'calc(env(safe-area-inset-top) + ' + TOP_EXTRA + 'px)';
+              }
+            }
+
+            apply();
+            setTimeout(apply, 80);
+            setTimeout(apply, 200);
+            setTimeout(apply, 450);
+            setTimeout(apply, 800);
+
+            if (!window.__dangbun_myplace_ob__) {
+              window.__dangbun_myplace_ob__ = new MutationObserver(function() { apply(); });
+              window.__dangbun_myplace_ob__.observe(document.documentElement, { childList:true, subtree:true });
+            }
+          } catch(e) {}
         })();
     """.trimIndent()
 
