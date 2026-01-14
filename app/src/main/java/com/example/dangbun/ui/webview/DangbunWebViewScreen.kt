@@ -159,6 +159,7 @@ fun DangbunWebViewScreen(
                     if (url.contains("kakao.com", ignoreCase = true)) {
                         injectKakaoLtrFix(view)
                     }
+                    injectMyPlaceTopInsetFix(view)
                 }
 
                 override fun onReceivedError(
@@ -434,6 +435,96 @@ private fun injectKakaoLtrFix(view: WebView) {
               document.head.appendChild(style);
             }
           } catch (e) {}
+        })();
+    """.trimIndent()
+
+    view.evaluateJavascript(js, null)
+}
+
+private fun injectMyPlaceTopInsetFix(view: WebView) {
+    val js = """
+        (function() {
+          try {
+            function isMyPlace() {
+              var href = (location && location.href) ? location.href : '';
+              var path = (location && location.pathname) ? location.pathname : '';
+              
+              // ✅ 경로/URL 힌트 (필요하면 더 정확히 좁혀도 됨)
+              var hint = /myplace|place|내플레이스|내\s*플레이스/i.test(href) || /myplace|place/i.test(path);
+              if (!hint) return false;
+
+              // ✅ 텍스트 힌트: '내 플레이스' 타이틀이 화면에 있어야 적용
+              var nodes = document.querySelectorAll('h1,h2,h3,header,div,span,p');
+              for (var i=0; i<nodes.length; i++) {
+                var t = (nodes[i].innerText || '').trim();
+                if (t === '내 플레이스') return true;
+              }
+              return false;
+            }
+
+            function apply() {
+              if (!isMyPlace()) return;
+
+              var TOP_EXTRA = 28; // ✅ 추가로 더 내릴 px (원하면 20~48 조절)
+              
+              // 1) '내 플레이스' 텍스트 요소 찾기
+              var titleEl = null;
+              var candidates = document.querySelectorAll('h1,h2,h3,header,div,span,p');
+              for (var i=0; i<candidates.length; i++) {
+                var t = (candidates[i].innerText || '').trim();
+                if (t === '내 플레이스') { titleEl = candidates[i]; break; }
+              }
+              if (!titleEl) return;
+
+              // 2) 위로 올라가며 fixed/sticky 조상 찾기
+              var cur = titleEl;
+              var header = null;
+              for (var d=0; d<12 && cur; d++) {
+                var st = window.getComputedStyle(cur);
+                if (st && (st.position === 'fixed' || st.position === 'sticky')) { header = cur; break; }
+                cur = cur.parentElement;
+              }
+
+              // 3) 헤더가 있으면 top 내리고, 없으면 타이틀에 marginTop
+              if (header) {
+                if (header.__dangbun_myplace_pushed__) return;
+                header.__dangbun_myplace_pushed__ = true;
+
+                header.style.top = 'calc(env(safe-area-inset-top) + ' + TOP_EXTRA + 'px)';
+                header.style.zIndex = '999999';
+
+                // 4) 본문도 헤더 높이만큼 내려서 겹침 제거
+                var h = header.getBoundingClientRect().height || 0;
+                var pad = Math.ceil(h + TOP_EXTRA + 8);
+
+                var root = document.querySelector('#root') || document.querySelector('#__next') || document.querySelector('#app');
+                var main = document.querySelector('main');
+                var host = main || root || document.body;
+
+                var curPad = parseFloat((window.getComputedStyle(host).paddingTop || '0').replace('px','')) || 0;
+                if (pad > curPad) {
+                  host.style.paddingTop = pad + 'px';
+                  host.style.boxSizing = 'border-box';
+                }
+              } else {
+                // fixed/sticky가 없다면 타이틀 자체를 내려줌
+                titleEl.style.marginTop = 'calc(env(safe-area-inset-top) + ' + TOP_EXTRA + 'px)';
+              }
+            }
+
+            // ✅ 렌더 타이밍 대비 재시도
+            apply();
+            setTimeout(apply, 80);
+            setTimeout(apply, 200);
+            setTimeout(apply, 450);
+            setTimeout(apply, 800);
+
+            // ✅ SPA/DOM 변화에도 추적
+            if (!window.__dangbun_myplace_ob__) {
+              window.__dangbun_myplace_ob__ = new MutationObserver(function() { apply(); });
+              window.__dangbun_myplace_ob__.observe(document.documentElement, { childList:true, subtree:true });
+            }
+          } catch(e) {}
         })();
     """.trimIndent()
 
