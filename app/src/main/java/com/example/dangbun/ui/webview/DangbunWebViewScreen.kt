@@ -110,22 +110,24 @@ fun DangbunWebViewScreen(
                 override fun onPageFinished(view: WebView, url: String) {
                     super.onPageFinished(view, url)
 
-                    // ✅ (1) 스케일: WebView zoomBy로만 0.8 유지
-                    applyTargetScale(view)
+                    // ✅ 첫 렌더 직후 스크롤이 어긋나는 케이스 방지(아이콘 잘림 방지)
+                    view.post { view.scrollTo(0, 0) }
 
                     Log.d(TAG, "onPageFinished(url=$url) title=${view.title} scale=${view.scale}")
 
-                    // ✅ (2) 공통 보정(팝업 중앙 + vh 보정 + 가로 넘침 방지)
+                    // ✅ 스플래시(첫 화면)만 중앙 정렬 보정
+                    injectSplashCenterFix(view)
+
                     injectCommonFixes(view)
 
-                    // ✅ (3) 카카오 입력 커서 방향 보정
                     if (url.contains("kakao.com", ignoreCase = true)) {
                         injectKakaoLtrFix(view)
                     }
 
-                    // ✅ (4) 플레이스 생성 완료 화면 중앙 정렬 보정 (스크롤 컨테이너 기반)
                     injectPlaceCompleteCenterFix(view)
                 }
+
+
 
                 override fun onReceivedError(
                     view: WebView,
@@ -724,3 +726,110 @@ private fun injectPlaceCompleteCenterFix(view: WebView) {
 
     view.evaluateJavascript(js, null)
 }
+
+/**
+ * ✅ 첫 시작 화면(스플래시)만 중앙 정렬 + 잘림 방지
+ * - SPA에서도 다음 화면으로 넘어가면 자동 원복되도록 처리
+ */
+private fun injectSplashCenterFix(view: WebView) {
+    val js = """
+        (function() {
+          try {
+            // ----------------------------
+            // 공통: 원복 함수 (스플래시가 아니면 항상 원복)
+            // ----------------------------
+            function resetSplashStyles() {
+              try {
+                if (!window.__dangbun_splash_applied__) return;
+
+                document.documentElement.style.height = '';
+                document.body.style.minHeight = '';
+                document.body.style.margin = '';
+                document.body.style.display = '';
+                document.body.style.flexDirection = '';
+                document.body.style.justifyContent = '';
+                document.body.style.alignItems = '';
+
+                window.__dangbun_splash_applied__ = false;
+              } catch(e) {}
+            }
+
+            // ----------------------------
+            // 스플래시 판별 (너무 넓게 잡지 않기)
+            // 1) 루트 경로(또는 index) + 2) '당번' 텍스트 + 3) '다음' 버튼이 없음
+            // ----------------------------
+            var path = (location && location.pathname) ? location.pathname : '';
+            var isRoot = (path === '/' || path === '' || path === '/index.html');
+
+            var bodyText = (document.body && document.body.innerText) ? document.body.innerText : '';
+            var hasDangbun = bodyText.indexOf('당번') >= 0;
+
+            // 다음 화면(온보딩 등)에 '다음' 버튼이 있는 경우가 많아서 제외 조건으로 사용
+            var hasNext = false;
+            try {
+              var btns = document.querySelectorAll('button,a,[role="button"]');
+              for (var i=0; i<btns.length; i++) {
+                var t = (btns[i].innerText || '').trim();
+                if (t === '다음') { hasNext = true; break; }
+              }
+            } catch(e) {}
+
+            var isSplash = (isRoot && hasDangbun && !hasNext);
+
+            // 스플래시가 아니면 무조건 원복
+            if (!isSplash) {
+              resetSplashStyles();
+              return;
+            }
+
+            // ----------------------------
+            // 스플래시 적용
+            // ----------------------------
+            if (window.__dangbun_splash_applied__) return;
+            window.__dangbun_splash_applied__ = true;
+
+            // vh 흔들림 보정(--appVh가 있으면 우선 사용)
+            var fullH = 'calc(var(--appVh, 1vh) * 100)';
+
+            document.documentElement.style.height = fullH;
+            document.body.style.minHeight = fullH;
+
+            document.body.style.margin = '0';
+            document.body.style.display = 'flex';
+            document.body.style.flexDirection = 'column';
+            document.body.style.justifyContent = 'center';
+            document.body.style.alignItems = 'center';
+
+            window.scrollTo(0, 0);
+
+            // ----------------------------
+            // SPA에서 화면 전환 감지 → 스플래시 아니면 원복
+            // ----------------------------
+            if (!window.__dangbun_splash_observer__) {
+              window.__dangbun_splash_observer__ = new MutationObserver(function() {
+                try {
+                  // DOM이 바뀌면 다시 판별해서 스플래시가 아니면 원복
+                  var textNow = (document.body && document.body.innerText) ? document.body.innerText : '';
+                  var nowHasDangbun = textNow.indexOf('당번') >= 0;
+
+                  var nowHasNext = false;
+                  var btns2 = document.querySelectorAll('button,a,[role="button"]');
+                  for (var j=0; j<btns2.length; j++) {
+                    var tt = (btns2[j].innerText || '').trim();
+                    if (tt === '다음') { nowHasNext = true; break; }
+                  }
+
+                  var stillSplash = (nowHasDangbun && !nowHasNext && ((location.pathname||'') === '/' || (location.pathname||'') === '' || (location.pathname||'') === '/index.html'));
+                  if (!stillSplash) resetSplashStyles();
+                } catch(e) {}
+              });
+              window.__dangbun_splash_observer__.observe(document.documentElement, { childList: true, subtree: true });
+            }
+
+          } catch(e) {}
+        })();
+    """.trimIndent()
+
+    view.evaluateJavascript(js, null)
+}
+
