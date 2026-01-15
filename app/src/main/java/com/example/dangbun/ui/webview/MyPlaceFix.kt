@@ -9,8 +9,8 @@ internal object MyPlaceFix {
               try {
                 var GRAY_BG = '#F5F6F8'; 
                 var styleId = '__db_final_ordered_layout_fix_v3__';
-                
-                // ✅ [핵심] style 태그가 있으면 갱신(덮어쓰기), 없으면 생성
+
+                // ✅ style 태그 upsert
                 var style = document.getElementById(styleId);
                 if (!style) {
                   style = document.createElement('style');
@@ -30,7 +30,7 @@ internal object MyPlaceFix {
 
                   /* 2. 상단 헤더 박스 (정중앙 유지) */
                   .db-header-wrapper {
-                    background-color: ${'$'}{'$'}{GRAY_BG} !important;
+                    background-color: ${'$'}{GRAY_BG} !important;
                     width: 100% !important;
                     min-height: 56px !important;
                     padding-top: calc(env(safe-area-inset-top) + 12px) !important;
@@ -68,36 +68,67 @@ internal object MyPlaceFix {
                     background-color: transparent !important;
                   }
 
-                  /* 4. 플레이스 추가 버튼: 버블 아래 리스트 위에 위치 */
+                  /* ✅ 4. FAB 래퍼(가운데 고정) - 핵심: body로 옮기지 않고도 중앙 고정 */
                   .db-add-btn-wrap {
-                    position: relative !important;
-                    display: block !important;
-                    width: 100% !important;
-                    padding: 18px 16px 0 16px !important;
+                    position: fixed !important;
+                    left: 50% !important;
+                    bottom: 0 !important;
+                    transform: translateX(-50%) !important;
+
+                    width: calc(100vw - 32px) !important;
+                    max-width: calc(100vw - 32px) !important;
+
+                    z-index: 2147483647 !important;
+                    margin: 0 !important;
+                    padding-bottom: 0 !important;
                     box-sizing: border-box !important;
-                    margin: 0 0 20px 0 !important;
-                    transform: none !important;
+                    background: transparent !important;
                   }
 
-                  /* ✅ 버튼 크기 강제 제거(원래 웹 스타일로 복원) */
                   .db-add-btn-wrap button {
                     position: static !important;
                     width: 100% !important;
                     max-width: none !important;
                     display: block !important;
+                    margin: 0 auto !important;
+                  }
+
+                  .db-add-btn-hidden {
+                    display: none !important;
+                    visibility: hidden !important;
+                    pointer-events: none !important;
+                    height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
                   }
                 `;
 
                 function apply() {
-                  var path = location.pathname;
-                  var isMyPlace = (path.indexOf('MyPlace') >= 0 || path.indexOf('myplace') >= 0 || document.body.innerText.indexOf('내 플레이스') >= 0);
+                  var path = location.pathname || '';
+                  var isMyPlace = (path.indexOf('MyPlace') >= 0 || path.indexOf('myplace') >= 0 || (document.body && document.body.innerText || '').indexOf('내 플레이스') >= 0);
                   if (!isMyPlace) return;
-                  
+
+                  // ✅ "리스트 화면"에서만 FAB를 고정하고, 상세 화면에서는 숨김 처리
+                  // (텍스트 기반 휴리스틱: 리스트에만 반복적으로 보이는 요소들)
+                  function isListView() {
+                    try {
+                      var text = (document.body && document.body.innerText) ? document.body.innerText : '';
+                      var score = 0;
+                      if (text.indexOf('새로운 알림') >= 0) score++;
+                      if (text.indexOf('완료된 청소') >= 0) score++;
+                      if (text.indexOf('매니저') >= 0) score++;
+                      // 리스트 특징이 2개 이상이면 리스트로 간주
+                      return score >= 2;
+                    } catch(e) { return true; }
+                  }
+
+                  var inList = isListView();
+
                   // 배경색 강제 적용 (화면 덮는 흰색 박스 제거)
                   try {
                     document.documentElement.style.setProperty('background-color', GRAY_BG, 'important');
                     document.body.style.setProperty('background-color', GRAY_BG, 'important');
-                    
+
                     var scopes = [document.body, document.querySelector('#root'), document.querySelector('main')].filter(Boolean);
                     for (var s = 0; s < scopes.length; s++) {
                       var candidates = scopes[s].querySelectorAll('div, section, article');
@@ -116,105 +147,150 @@ internal object MyPlaceFix {
                   } catch(e) {}
 
                   // A. 헤더 영역 정리
-                  var tags = document.querySelectorAll('h1,h2,h3,header,div,span');
-                  for (var i=0; i<tags.length; i++) {
-                    if (tags[i].innerText.trim() === '내 플레이스' && !tags[i].__hooked) {
-                      tags[i].__hooked = true;
-                      tags[i].classList.add('db-title-text');
-                      
-                      var header = tags[i].parentElement;
-                      while(header && header.offsetWidth < window.innerWidth * 0.8) {
-                        header = header.parentElement;
-                      }
-                      
-                      if (header) {
-                        header.classList.add('db-header-wrapper');
-                        var menu = header.querySelector('svg, button, [class*="menu"]');
-                        if (menu && menu !== tags[i]) {
-                          menu.classList.add('db-menu-icon');
+                  try {
+                    var tags = document.querySelectorAll('h1,h2,h3,header,div,span');
+                    for (var i=0; i<tags.length; i++) {
+                      if ((tags[i].innerText || '').trim() === '내 플레이스' && !tags[i].__hooked) {
+                        tags[i].__hooked = true;
+                        tags[i].classList.add('db-title-text');
+
+                        var header = tags[i].parentElement;
+                        while(header && header.offsetWidth < window.innerWidth * 0.8) {
+                          header = header.parentElement;
                         }
+
+                        if (header) {
+                          header.classList.add('db-header-wrapper');
+                          var menu = header.querySelector('svg, button, [class*="menu"]');
+                          if (menu && menu !== tags[i]) {
+                            menu.classList.add('db-menu-icon');
+                          }
+                        }
+                        break;
                       }
-                      break;
                     }
-                  }
+                  } catch(e) {}
 
                   // B. 버블 위치 보정
                   var bubbleEl = null;
-                  var divs = document.querySelectorAll('div,section,p');
-                  for (var j=0; j<divs.length; j++) {
-                    if (divs[j].innerText.indexOf('오늘 남은 청소는') >= 0) {
-                      var bubble = divs[j];
-                      for(var d=0; d<3 && bubble.parentElement; d++) {
-                        if (getComputedStyle(bubble).borderRadius !== '0px') break;
-                        bubble = bubble.parentElement;
+                  try {
+                    var divs = document.querySelectorAll('div,section,p');
+                    for (var j=0; j<divs.length; j++) {
+                      if ((divs[j].innerText || '').indexOf('오늘 남은 청소는') >= 0) {
+                        var bubble = divs[j];
+                        for(var d=0; d<3 && bubble.parentElement; d++) {
+                          if (getComputedStyle(bubble).borderRadius !== '0px') break;
+                          bubble = bubble.parentElement;
+                        }
+                        bubble.id = 'db-bubble-fix';
+                        bubbleEl = bubble;
+                        break;
                       }
-                      bubble.id = 'db-bubble-fix';
-                      bubbleEl = bubble;
-                      break;
                     }
-                  }
+                  } catch(e) {}
 
-                  // C. 하단 버튼 처리 및 리스트 하단 여백 추가
+                  // C. 플레이스 추가 버튼 처리
                   var btns = document.querySelectorAll('button');
                   for (var k = 0; k < btns.length; k++) {
                     var btn = btns[k];
-                    if ((btn.innerText || '').indexOf('플레이스 추가') >= 0) {
-                      
-                      // 1. 리스트 하단 여백(padding-bottom) 늘리기
-                      try {
-                        function findScrollHost(seed) {
-                          // ✅ 1) 가장 우선: 문서 스크롤 자체가 있으면 그걸 사용
-                          var docEl = document.scrollingElement || document.documentElement;
-                          if (docEl && docEl.scrollHeight > docEl.clientHeight + 10) return docEl;
+                    if (((btn.innerText || '')).indexOf('플레이스 추가') >= 0) {
 
-                          // ✅ 2) 전역에서 "스크롤 가능한 큰 컨테이너"를 찾아서 선택
-                          var best = null;
-                          var bestScore = 0;
+                      // 0) 상세 화면이면: FAB 고정 해제 + 숨김 (버튼이 DOM에 남아있어도 안 보이게)
+                      if (!inList) {
+                        try {
+                          var wrap0 = btn.parentElement || btn;
+                          // 래퍼가 이미 db-add-btn-wrap로 고정돼 있으면 풀어주고 숨김
+                          wrap0.classList.remove('db-add-btn-wrap');
+                          wrap0.style.removeProperty('position');
+                          wrap0.style.removeProperty('left');
+                          wrap0.style.removeProperty('right');
+                          wrap0.style.removeProperty('bottom');
+                          wrap0.style.removeProperty('width');
+                          wrap0.style.removeProperty('transform');
+                          wrap0.style.removeProperty('padding');
+                          wrap0.style.removeProperty('z-index');
+                          wrap0.style.setProperty('display', 'none', 'important');
+                        } catch(e) {}
+                        break;
+                      }
 
-                          var nodes = document.querySelectorAll('body *');
-                          for (var i = 0; i < nodes.length; i++) {
-                            var el = nodes[i];
-                            if (!el || !el.getBoundingClientRect) continue;
+                      // 1) 스크롤 호스트 찾아 padding-bottom 확보(겹침 방지)
+                      function findScrollHost(seed) {
+                        var docEl = document.scrollingElement || document.documentElement;
+                        if (docEl && docEl.scrollHeight > docEl.clientHeight + 10) return docEl;
 
-                            var st = window.getComputedStyle(el);
-                            var oy = st ? st.overflowY : '';
-                            if (oy !== 'auto' && oy !== 'scroll') continue;
+                        var best = null;
+                        var bestScore = 0;
+                        var nodes = document.querySelectorAll('body *');
+                        for (var i = 0; i < nodes.length; i++) {
+                          var el = nodes[i];
+                          if (!el || !el.getBoundingClientRect) continue;
 
-                            var ch = el.clientHeight || 0;
-                            var sh = el.scrollHeight || 0;
-                            if (sh <= ch + 10) continue;
+                          var st = window.getComputedStyle(el);
+                          var oy = st ? st.overflowY : '';
+                          if (oy !== 'auto' && oy !== 'scroll') continue;
 
-                            // 화면 높이의 절반 이상 차지하는 "메인 스크롤"을 우선
-                            if (ch < window.innerHeight * 0.5) continue;
+                          var ch = el.clientHeight || 0;
+                          var sh = el.scrollHeight || 0;
+                          if (sh <= ch + 10) continue;
+                          if (ch < window.innerHeight * 0.5) continue;
 
-                            // 점수: (스크롤 가능한 양) * (컨테이너 크기)
-                            var score = (sh - ch) * ch;
-                            if (score > bestScore) {
-                              bestScore = score;
-                              best = el;
-                            }
+                          var score = (sh - ch) * ch;
+                          if (score > bestScore) {
+                            bestScore = score;
+                            best = el;
                           }
-
-                          return best || document.querySelector('main') || document.body;
                         }
+                        return best || document.querySelector('main') || document.body;
+                      }
 
+                      try {
+                        // ✅ 1) 실제 FAB(랩/버튼) 높이를 기준으로 "딱 필요한 만큼"만 확보
+                        var wrapForMeasure = null;
+                        try {
+                          wrapForMeasure = (wrap && wrap.getBoundingClientRect) ? wrap : (btn.parentElement || btn);
+                        } catch(e) { wrapForMeasure = btn; }
 
-                        // ✅ 기존(24px)에서 120px로 대폭 늘려서 여유 공간 확보
-                        var btnH = Math.ceil(btn.getBoundingClientRect().height || 56);
-                        var safePx = (btnH + 220); 
-                        
+                        var fabH = 56;
+                        try {
+                          fabH = Math.ceil((wrapForMeasure.getBoundingClientRect().height || 56));
+                        } catch(e) {}
+
+                        // ✅ 버튼 위/아래 여유 (마지막 카드가 완전히 보이도록)
+                        var extra = 32; // 필요하면 48로만 올리면 됨
+                        var safePx = fabH + extra;
+
+                        // ✅ 2) "진짜 스크롤 컨테이너"를 못 잡는 케이스 대비: 여러 후보에 동시에 적용
                         var host = findScrollHost(btn);
-                        if (host) {
-                          host.style.setProperty(
+
+                        var targets = [
+                          host,
+                          document.querySelector('main'),
+                          document.querySelector('#root'),
+                          document.body,
+                          document.scrollingElement,
+                          document.documentElement
+                        ].filter(Boolean);
+
+                        for (var t = 0; t < targets.length; t++) {
+                          var el = targets[t];
+                          el.style.setProperty(
                             'padding-bottom',
                             'calc(' + safePx + 'px + env(safe-area-inset-bottom))',
                             'important'
                           );
-                          host.style.setProperty('box-sizing', 'border-box', 'important');
+                          el.style.setProperty('box-sizing', 'border-box', 'important');
+                          // ✅ 스크롤할 때도 하단 여유 반영 (일부 브라우저/레이아웃에서 효과 좋음)
+                          el.style.setProperty(
+                            'scroll-padding-bottom',
+                            'calc(' + safePx + 'px + env(safe-area-inset-bottom))',
+                            'important'
+                          );
                         }
                       } catch(e) {}
 
-                      // 2. 버튼 래퍼 처리 (크기 보존)
+
+                      // 2) 래퍼 잡기
                       var wrap = btn.parentElement;
                       try {
                         if (wrap) {
@@ -224,72 +300,34 @@ internal object MyPlaceFix {
                           }
                         }
                       } catch(e) {}
+                      if (!wrap) wrap = btn;
 
-                      if (wrap && !wrap.classList.contains('db-add-btn-wrap')) {
-                        wrap.classList.add('db-add-btn-wrap');
-                      }
+                      // ✅ 핵심: body로 옮기지 않는다 (클릭 이벤트/라우팅 유지)
+                      // document.body.appendChild(...) 제거
 
-                      /* ✅ [추가] 플레이스 추가 버튼을 FAB처럼 "화면에 따라오게" 고정 */
+                      // 3) FAB 고정(중앙)
                       try {
-                        // 0) wrap이 없으면 btn 기준으로 처리
-                        var fabWrap = wrap || btn;
+                        wrap.classList.add('db-add-btn-wrap');
 
-                        // 1) 스크롤 컨텐츠(리스트) 안에 있으면 일부 환경에서 잘릴 수 있어서 body로 이동
-                        //    (중복 이동 방지 플래그)
-                        if (fabWrap && !fabWrap.__dbFabPinned) {
-                          fabWrap.__dbFabPinned = true;
-                          document.body.appendChild(fabWrap);
-                        }
+                        wrap.style.setProperty('position', 'fixed', 'important');
+                        wrap.style.setProperty('left', '50%', 'important');
+                        wrap.style.setProperty('bottom', '0', 'important');
+                        wrap.style.setProperty('width', 'calc(100vw - 32px)', 'important');
+                        wrap.style.setProperty('max-width', 'calc(100vw - 32px)', 'important');
+                        wrap.style.setProperty('transform', 'translateX(-50%)', 'important');
+                        wrap.style.setProperty('z-index', '2147483647', 'important');
+                        wrap.style.setProperty('margin', '0', 'important');
+                        wrap.style.setProperty('padding-bottom', '0', 'important');
+                        wrap.style.setProperty('box-sizing', 'border-box', 'important');
+                        wrap.style.setProperty('background', 'transparent', 'important');
+                      } catch(e) {}
 
-                        // 2) FAB 스타일 적용: 화면 하단 고정 + 좌우 패딩 유지
-                        if (fabWrap) {
-                          fabWrap.style.setProperty('position', 'fixed', 'important');
-                          fabWrap.style.setProperty('left', '0', 'important');
-                          fabWrap.style.setProperty('right', '0', 'important');
-                          fabWrap.style.setProperty('bottom', '0', 'important');
-                          fabWrap.style.setProperty('width', '100%', 'important');
-                          fabWrap.style.setProperty('z-index', '2147483647', 'important'); // 최상단
-                          fabWrap.style.setProperty('margin', '0', 'important');
-                          fabWrap.style.setProperty('transform', 'none', 'important');
-
-                          // 좌우 16px, 아래는 safe-area만 반영
-                          fabWrap.style.setProperty('padding', '0 16px env(safe-area-inset-bottom) 16px', 'important');
-                          fabWrap.style.setProperty('box-sizing', 'border-box', 'important');
-
-                          // 배경은 투명(원래 화면처럼)
-                          fabWrap.style.setProperty('background', 'transparent', 'important');
-                        }
-
-                        // 3) 리스트(스크롤 컨테이너) 하단 여백은 FAB 높이만큼 유지(겹침 방지)
-                        //    (이미 safePx 로 padding-bottom 주고 있어서, 혹시 모자라면 여기서 보강)
-                        var fabH = Math.ceil((fabWrap && fabWrap.getBoundingClientRect) ? fabWrap.getBoundingClientRect().height : 0);
-                        if (fabH > 0) {
-                          var host2 = findScrollHost(btn);
-                          if (host2) {
-                            host2.style.setProperty(
-                              'padding-bottom',
-                              'calc(' + (fabH + 24) + 'px + env(safe-area-inset-bottom))',
-                              'important'
-                            );
-                            host2.style.setProperty('box-sizing', 'border-box', 'important');
-                          }
+                      // 4) (선택) 버블 아래로 위치 이동 — root 내부 이동이므로 클릭 유지
+                      try {
+                        if (bubbleEl && bubbleEl.parentNode && wrap && bubbleEl.parentNode.nodeType !== 9) {
+                          bubbleEl.parentNode.insertBefore(wrap, bubbleEl.nextSibling);
                         }
                       } catch(e) {}
-                      
-                      // 3. 위치 이동 (버블 뒤)
-                      // ✅ FAB로 body에 붙인 경우에는 DOM 재배치(insertBefore/prepend) 시도하면 HierarchyRequestError가 날 수 있어서 스킵
-                      var isFabPinned = !!(wrap && wrap.__dbFabPinned);
-
-                      if (!isFabPinned) {
-                        if (bubbleEl && bubbleEl.parentNode && wrap && bubbleEl.parentNode.nodeType !== 9) {
-                          // nodeType 9 = document (document에는 element를 insertBefore 하면 에러 날 수 있음)
-                          bubbleEl.parentNode.insertBefore(wrap, bubbleEl.nextSibling);
-                        } else if (wrap) {
-                          var container = document.querySelector('main') || document.querySelector('#root');
-                          if (container && container.nodeType !== 9) container.prepend(wrap);
-                        }
-                      }
-
 
                       break;
                     }
@@ -297,9 +335,11 @@ internal object MyPlaceFix {
                 }
 
                 apply();
-                var mo = new MutationObserver(apply);
+                var mo = new MutationObserver(function(){ apply(); });
                 mo.observe(document.documentElement, { childList: true, subtree: true });
-                window.addEventListener('popstate', function() { setTimeout(apply, 100); });
+
+                window.addEventListener('popstate', function() { setTimeout(apply, 120); });
+                window.addEventListener('resize', function() { setTimeout(apply, 60); });
               } catch(e) {}
             })();
         """.trimIndent()
