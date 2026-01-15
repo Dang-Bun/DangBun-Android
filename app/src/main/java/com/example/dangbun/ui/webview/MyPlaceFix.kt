@@ -229,37 +229,67 @@ internal object MyPlaceFix {
                         wrap.classList.add('db-add-btn-wrap');
                       }
 
-                      /* ✅ [추가] 플레이스 추가 버튼이 떠 있는 고정 영역을 아래로 내림 (겹침 완화) */
+                      /* ✅ [추가] 플레이스 추가 버튼을 FAB처럼 "화면에 따라오게" 고정 */
                       try {
-                        // 버튼/래퍼 기준으로 위로 올라가며 fixed/sticky 컨테이너 탐색
-                        var fixedHost = wrap || btn;
-                        for (var t = 0; t < 6 && fixedHost; t++) {
-                          var st = window.getComputedStyle(fixedHost);
-                          if (st && (st.position === 'fixed' || st.position === 'sticky')) break;
-                          fixedHost = fixedHost.parentElement;
+                        // 0) wrap이 없으면 btn 기준으로 처리
+                        var fabWrap = wrap || btn;
+
+                        // 1) 스크롤 컨텐츠(리스트) 안에 있으면 일부 환경에서 잘릴 수 있어서 body로 이동
+                        //    (중복 이동 방지 플래그)
+                        if (fabWrap && !fabWrap.__dbFabPinned) {
+                          fabWrap.__dbFabPinned = true;
+                          document.body.appendChild(fabWrap);
                         }
 
-                        // 찾았으면 "바닥에 붙이기"
-                        if (fixedHost) {
-                          fixedHost.style.setProperty('bottom', '0px', 'important');
-                          fixedHost.style.setProperty('margin-bottom', '0px', 'important');
-                          fixedHost.style.setProperty('transform', 'none', 'important');
+                        // 2) FAB 스타일 적용: 화면 하단 고정 + 좌우 패딩 유지
+                        if (fabWrap) {
+                          fabWrap.style.setProperty('position', 'fixed', 'important');
+                          fabWrap.style.setProperty('left', '0', 'important');
+                          fabWrap.style.setProperty('right', '0', 'important');
+                          fabWrap.style.setProperty('bottom', '0', 'important');
+                          fabWrap.style.setProperty('width', '100%', 'important');
+                          fabWrap.style.setProperty('z-index', '2147483647', 'important'); // 최상단
+                          fabWrap.style.setProperty('margin', '0', 'important');
+                          fabWrap.style.setProperty('transform', 'none', 'important');
 
-                          // 혹시 safe-area 때문에 위로 떠있는 케이스는 padding으로만 처리
-                          fixedHost.style.setProperty('padding-bottom', 'env(safe-area-inset-bottom)', 'important');
+                          // 좌우 16px, 아래는 safe-area만 반영
+                          fabWrap.style.setProperty('padding', '0 16px env(safe-area-inset-bottom) 16px', 'important');
+                          fabWrap.style.setProperty('box-sizing', 'border-box', 'important');
+
+                          // 배경은 투명(원래 화면처럼)
+                          fabWrap.style.setProperty('background', 'transparent', 'important');
                         }
 
-                        // 버튼 자체도 불필요한 여백 제거
-                        btn.style.setProperty('margin-bottom', '0px', 'important');
-                      } catch(e) {}                      
+                        // 3) 리스트(스크롤 컨테이너) 하단 여백은 FAB 높이만큼 유지(겹침 방지)
+                        //    (이미 safePx 로 padding-bottom 주고 있어서, 혹시 모자라면 여기서 보강)
+                        var fabH = Math.ceil((fabWrap && fabWrap.getBoundingClientRect) ? fabWrap.getBoundingClientRect().height : 0);
+                        if (fabH > 0) {
+                          var host2 = findScrollHost(btn);
+                          if (host2) {
+                            host2.style.setProperty(
+                              'padding-bottom',
+                              'calc(' + (fabH + 24) + 'px + env(safe-area-inset-bottom))',
+                              'important'
+                            );
+                            host2.style.setProperty('box-sizing', 'border-box', 'important');
+                          }
+                        }
+                      } catch(e) {}
                       
                       // 3. 위치 이동 (버블 뒤)
-                      if (bubbleEl && bubbleEl.parentNode && wrap) {
-                        bubbleEl.parentNode.insertBefore(wrap, bubbleEl.nextSibling);
-                      } else if (wrap) {
-                        var container = document.querySelector('main') || document.querySelector('#root');
-                        if (container) container.prepend(wrap);
+                      // ✅ FAB로 body에 붙인 경우에는 DOM 재배치(insertBefore/prepend) 시도하면 HierarchyRequestError가 날 수 있어서 스킵
+                      var isFabPinned = !!(wrap && wrap.__dbFabPinned);
+
+                      if (!isFabPinned) {
+                        if (bubbleEl && bubbleEl.parentNode && wrap && bubbleEl.parentNode.nodeType !== 9) {
+                          // nodeType 9 = document (document에는 element를 insertBefore 하면 에러 날 수 있음)
+                          bubbleEl.parentNode.insertBefore(wrap, bubbleEl.nextSibling);
+                        } else if (wrap) {
+                          var container = document.querySelector('main') || document.querySelector('#root');
+                          if (container && container.nodeType !== 9) container.prepend(wrap);
+                        }
                       }
+
 
                       break;
                     }
