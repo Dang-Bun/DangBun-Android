@@ -5,11 +5,9 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Message
 import android.util.Log
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
-import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -41,25 +39,17 @@ fun DangbunWebViewScreen(
     val webView = remember {
         WebView(context).apply {
             Log.d(TAG, "WebView init, startUrl=$url")
-
-            // ✅ WebView가 투명해져서 아래 배경이 비치는 것 방지
             setBackgroundColor(android.graphics.Color.WHITE)
 
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
-
-            // ✅ viewport는 1.0으로 고정 (스케일은 zoomBy로 처리)
             settings.useWideViewPort = true
             settings.loadWithOverviewMode = false
-
-            // zoom은 켜두되, 컨트롤은 숨김
             settings.setSupportZoom(true)
             settings.builtInZoomControls = true
             settings.displayZoomControls = false
-
             settings.javaScriptCanOpenWindowsAutomatically = true
             settings.setSupportMultipleWindows(true)
-
             settings.cacheMode = WebSettings.LOAD_DEFAULT
 
             val defaultUa = settings.userAgentString
@@ -68,119 +58,52 @@ fun DangbunWebViewScreen(
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(view: WebView, newProgress: Int) {
                     super.onProgressChanged(view, newProgress)
-                    Log.d(TAG, "onProgressChanged=$newProgress url=${view.url}")
-                }
-
-                override fun onCreateWindow(
-                    view: WebView,
-                    isDialog: Boolean,
-                    isUserGesture: Boolean,
-                    resultMsg: Message,
-                ): Boolean {
-                    Log.d(TAG, "onCreateWindow(isDialog=$isDialog, isUserGesture=$isUserGesture)")
-                    val transport = resultMsg.obj as WebView.WebViewTransport
-                    transport.webView = view
-                    resultMsg.sendToTarget()
-                    return true
-                }
-
-                override fun onReceivedTitle(view: WebView, title: String?) {
-                    super.onReceivedTitle(view, title)
-                    Log.d(TAG, "onReceivedTitle(title=$title) url=${view.url}")
                 }
 
                 override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
-                    Log.e(
-                        TAG,
-                        "WV_CONSOLE(${consoleMessage.messageLevel()}): ${consoleMessage.message()} " +
-                            "(${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})"
-                    )
+                    Log.e(TAG, "WV_CONSOLE(${consoleMessage.messageLevel()}): ${consoleMessage.message()} (${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})")
                     return super.onConsoleMessage(consoleMessage)
                 }
             }
 
             webViewClient = object : WebViewClient() {
-
-                override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                    Log.d(TAG, "shouldOverrideUrlLoading(url=$url) currentUrl=${view.url}")
-                    val handled = handleUrl(context, url, view)
-                    Log.d(TAG, "shouldOverrideUrlLoading handled=$handled")
-                    return handled
-                }
-
-                override fun shouldOverrideUrlLoading(
-                    view: WebView,
-                    request: WebResourceRequest
-                ): Boolean {
-                    val nextUrl = request.url.toString()
-                    Log.d(
-                        TAG,
-                        "shouldOverrideUrlLoading(requestUrl=$nextUrl) currentUrl=${view.url}"
-                    )
-                    val handled = handleUrl(context, nextUrl, view)
-                    Log.d(TAG, "shouldOverrideUrlLoading handled=$handled")
-                    return handled
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                    return handleUrl(context, request.url.toString(), view)
                 }
 
                 override fun onPageFinished(view: WebView, url: String) {
                     super.onPageFinished(view, url)
-
                     view.post { view.scrollTo(0, 0) }
 
-                    Log.d(TAG, "onPageFinished(url=$url) title=${view.title} scale=${view.scale}")
-
-                    // ✅ 콘솔 훅 확인
-                    view.evaluateJavascript(
-                        "console.log('WV_PING', location.href, navigator.userAgent);",
-                        null
-                    )
-
-                    // ✅ 팝업(모달) 중앙정렬 고정 (위로 붙는 현상 방지)
+                    // 공통 픽스 (모달 등)
                     injectCommonFixes(view)
-
-                    // ✅ 스플래시인지 판단해서:
-                    // 1) 0.8 배율 강제(zoomBy)
-                    // 2) 스플래시 중앙정렬(로고 블록을 fixed-center)
+                    // 스플래시 픽스
                     injectSplashFix(view)
+                    // 카카오 방향 픽스
+                    if (url.contains("kakao.com")) injectKakaoLtrFix(view)
 
-                    // ✅ 배경 체크 로그
-                    view.evaluateJavascript(
-                        """
-                        (function(){
-                          try{
-                            var bg = getComputedStyle(document.body).backgroundColor;
-                            var root = document.querySelector('#root');
-                            var rootBg = root ? getComputedStyle(root).backgroundColor : null;
-                            return JSON.stringify({ bodyBg:bg, rootBg:rootBg });
-                          }catch(e){ return "ERR:"+e.message; }
-                        })();
-                        """.trimIndent()
-                    ) { result ->
-                        Log.d(TAG, "WV_BG=$result")
-                    }
-
-                    if (url.contains("kakao.com", ignoreCase = true)) {
-                        injectKakaoLtrFix(view)
-                    }
-
-                    injectMyPlaceTopInsetFix(view)
-                    injectMyPlaceBottomCtaInsetFix(view)
+                    // ✅ [핵심] 내 플레이스 통합 픽스 (상단/하단 간격 유지)
+                    injectMyPlaceUnifiedFix(view)
+                    // 멤버 선택 화면 픽스
                     injectAddPlaceMemberSelectInsetFix(view)
-                }
 
-                override fun onReceivedError(
-                    view: WebView,
-                    request: WebResourceRequest,
-                    error: WebResourceError,
-                ) {
-                    super.onReceivedError(view, request, error)
-                    Log.e(
-                        TAG,
-                        "onReceivedError(url=${request.url}) code=${error.errorCode} desc=${error.description}"
-                    )
+                    // SPA 네비게이션 감지 후 픽스 재실행
+                    view.evaluateJavascript("""
+                        (function() {
+                          if (window.__dangbun_spa_hook__) return;
+                          window.__dangbun_spa_hook__ = true;
+                          var notify = function() { 
+                            console.log('SPA_NAV_DETECTED', location.pathname);
+                          };
+                          var _ps = history.pushState;
+                          history.pushState = function() { _ps.apply(this, arguments); notify(); };
+                          var _rs = history.replaceState;
+                          history.replaceState = function() { _rs.apply(this, arguments); notify(); };
+                          window.addEventListener('popstate', notify);
+                        })();
+                    """.trimIndent(), null)
                 }
             }
-
             loadUrl(url)
         }
     }
@@ -189,10 +112,131 @@ fun DangbunWebViewScreen(
         if (webView.canGoBack()) webView.goBack() else onClose()
     }
 
-    AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { webView },
-    )
+    AndroidView(modifier = Modifier.fillMaxSize(), factory = { webView })
+}
+
+/**
+ * ✅ 내 플레이스 화면 통합 픽스 (상단 타이틀/리스트 간격 + 하단 여백)
+ * 뒤로가기 시에도 MutationObserver가 ID를 다시 부여하여 스타일을 즉시 복구함
+ */
+private fun injectMyPlaceUnifiedFix(view: WebView) {
+    val js = """
+        (function() {
+          try {
+            // ✅ 웹사이트와 동일한 배경색 (연한 회색)
+            var GRAY_BG = '#F5F6F8'; 
+
+            var styleId = '__dangbun_final_v3_style__';
+            if (!document.getElementById(styleId)) {
+              var style = document.createElement('style');
+              style.id = styleId;
+              style.innerHTML = `
+                /* 1. 전체 배경색 통일 (이질감 제거) */
+                html, body, #root, #__next, main {
+                  background-color: ${'$'}{GRAY_BG} !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                }
+
+                /* 2. 내 플레이스 타이틀 정렬 및 간격 축소 */
+                #db-title-fix {
+                  display: flex !important;
+                  justify-content: center !important;
+                  align-items: center !important;
+                  width: 100% !important;
+                  /* ✅ 배경색을 회색으로 통일하여 리스트와 이어지게 함 */
+                  background-color: ${'$'}{GRAY_BG} !important; 
+                  margin: 0 !important;
+                  padding-top: calc(env(safe-area-inset-top) + 20px) !important;
+                  /* ✅ 하단 간격 대폭 축소 */
+                  padding-bottom: 4px !important; 
+                }
+
+                #db-title-fix > * {
+                  margin: 0 !important;
+                  text-align: center !important;
+                  font-weight: bold !important;
+                  color: #333 !important;
+                }
+
+                /* 3. '오늘 남은 청소' 버블 위치 미세 조정 */
+                #db-bubble-fix {
+                  margin: 8px auto 16px auto !important; 
+                  display: flex !important;
+                  justify-content: center !important;
+                  width: 100% !important;
+                  background-color: transparent !important;
+                }
+
+                /* 4. 하단 버튼과 리스트 사이 여백 확대 (플레이스 추가 버튼 위쪽) */
+                #db-scroll-host-fix {
+                  /* ✅ 리스트 마지막 항목이 버튼에 너무 붙지 않게 여백 추가 */
+                  padding-bottom: 160px !important; 
+                  box-sizing: border-box !important;
+                  background-color: ${'$'}{GRAY_BG} !important;
+                }
+              `;
+              document.head.appendChild(style);
+            }
+
+            function apply() {
+              var path = location.pathname;
+              var isMyPlace = (path.indexOf('MyPlace') >= 0 || path.indexOf('myplace') >= 0 || document.body.innerText.indexOf('내 플레이스') >= 0);
+              
+              if (!isMyPlace) return;
+
+              // WebView 바탕색 강제 설정
+              document.documentElement.style.backgroundColor = GRAY_BG;
+              document.body.style.backgroundColor = GRAY_BG;
+
+              // A. 타이틀 영역 ID 부여
+              var tags = document.querySelectorAll('h1,h2,h3,header,div,span,p');
+              for (var i=0; i<tags.length; i++) {
+                if (tags[i].innerText.trim() === '내 플레이스') {
+                  var target = tags[i];
+                  // 텍스트를 감싼 부모 중 가로가 넓은 요소를 영역으로 잡음
+                  if (target.parentElement && target.parentElement.offsetWidth > target.offsetWidth) {
+                    target = target.parentElement;
+                  }
+                  if (target.id !== 'db-title-fix') target.id = 'db-title-fix';
+                  break;
+                }
+              }
+
+              // B. 청소 알림 버블 ID 부여
+              var divs = document.querySelectorAll('div,section,p,span');
+              for (var j=0; j<divs.length; j++) {
+                if (divs[j].innerText.indexOf('오늘 남은 청소는') >= 0) {
+                  var bubble = divs[j];
+                  for(var d=0; d<3 && bubble.parentElement; d++) {
+                    var st = window.getComputedStyle(bubble);
+                    if (st.borderStyle !== 'none' || st.borderRadius !== '0px') break;
+                    bubble = bubble.parentElement;
+                  }
+                  if (bubble.id !== 'db-bubble-fix') bubble.id = 'db-bubble-fix';
+                  break;
+                }
+              }
+
+              // C. 스크롤 컨테이너 ID 부여
+              var host = document.querySelector('main') || document.querySelector('#root') || document.body;
+              if (host.id !== 'db-scroll-host-fix') host.id = 'db-scroll-host-fix';
+            }
+
+            apply();
+
+            if (!window.__dangbun_final_ob_v3__) {
+              window.__dangbun_final_ob_v3__ = true;
+              var mo = new MutationObserver(apply);
+              mo.observe(document.documentElement, { childList: true, subtree: true });
+              window.addEventListener('popstate', function() {
+                [10, 100, 300, 600].forEach(t => setTimeout(apply, t));
+              });
+            }
+          } catch(e) {}
+        })();
+    """.trimIndent()
+    view.evaluateJavascript(js, null)
 }
 
 private fun handleUrl(
@@ -526,153 +570,6 @@ private fun injectKakaoLtrFix(view: WebView) {
     view.evaluateJavascript(js, null)
 }
 
-private fun injectMyPlaceTopInsetFix(view: WebView) {
-    val js = """
-        (function() {
-          try {
-            function isMyPlace() {
-              var href = (location && location.href) ? location.href : '';
-              var path = (location && location.pathname) ? location.pathname : '';
-
-              var hint = /myplace|place|내플레이스|내\s*플레이스/i.test(href) || /myplace|place/i.test(path);
-              if (!hint) return false;
-
-              var nodes = document.querySelectorAll('h1,h2,h3,header,div,span,p');
-              for (var i=0; i<nodes.length; i++) {
-                var t = (nodes[i].innerText || '').trim();
-                if (t === '내 플레이스') return true;
-              }
-              return false;
-            }
-
-            function findTitleEl() {
-              var candidates = document.querySelectorAll('h1,h2,h3,header,div,span,p');
-              for (var i=0; i<candidates.length; i++) {
-                var t = (candidates[i].innerText || '').trim();
-                if (t === '내 플레이스') return candidates[i];
-              }
-              return null;
-            }
-
-            // ✅ "흰 띠" 제거: 상단 첫 컨텐츠(오늘 남은 청소는...)의 위 여백을 강제로 줄임
-            function tightenFirstContentGap() {
-              try {
-                var TIGHTEN = 22; // ✅ 14~32 사이로 조절 (클수록 흰 띠가 더 줄어듦)
-
-                // 1) '오늘 남은 청소는' 문구가 있는 요소 찾기
-                var nodes = document.querySelectorAll('div,section,main,span,p,button');
-                var target = null;
-                for (var i=0; i<nodes.length; i++) {
-                  var txt = (nodes[i].innerText || '').trim();
-                  if (txt.indexOf('오늘 남은 청소는') >= 0) { target = nodes[i]; break; }
-                }
-                if (!target) return;
-
-                // 2) 너무 작은 span/p가 잡히면, 적당히 큰 래퍼로 올려잡기
-                var wrap = target;
-                for (var up=0; up<8 && wrap && wrap.parentElement; up++) {
-                  var r = wrap.getBoundingClientRect();
-                  if (r.width >= (window.innerWidth * 0.7)) break;
-                  wrap = wrap.parentElement;
-                }
-                if (!wrap) return;
-
-                // 3) 위쪽 여백 "음수"로 당기지 말고, 기존 값에서 TIGHTEN 만큼만 줄이되 0 아래로는 안 내려가게(clamp)
-                var curMt = parseFloat((getComputedStyle(wrap).marginTop || '0').replace('px','')) || 0;
-                var curPt = parseFloat((getComputedStyle(wrap).paddingTop || '0').replace('px','')) || 0;
-
-                // 내 플레이스와 남은 청소 멘트 박스 사이의 간격
-                var MIN_GAP = 40; // 8~16 사이로 취향 조절
-
-                var newMt = Math.max(MIN_GAP, curMt - TIGHTEN);
-                var newPt = Math.max(0, curPt - TIGHTEN);
-
-                wrap.style.setProperty('margin-top', newMt + 'px', 'important');
-                wrap.style.setProperty('padding-top', newPt + 'px', 'important');
-
-                // 4) 바로 다음 리스트 래퍼도 위 여백이 있으면 같이 줄이기
-                var next = wrap.nextElementSibling;
-                if (next) {
-                  next.style.setProperty('margin-top', '0px', 'important');
-                  next.style.setProperty('padding-top', '0px', 'important');
-                }
-              } catch(e) {}
-            }
-
-            function apply() {
-              if (!isMyPlace()) return;
-
-              var TOP_EXTRA = 28;
-
-              var titleEl = findTitleEl();
-              if (!titleEl) return;
-
-              // ✅ "내 플레이스" 텍스트 아래 여백 줄이기(기존 유지)
-              try {
-                titleEl.style.setProperty('margin-bottom', '8px', 'important');
-                titleEl.style.setProperty('padding-bottom', '0px', 'important');
-
-                var next0 = titleEl.nextElementSibling;
-                if (next0) {
-                  next0.style.setProperty('margin-top', '8px', 'important');
-                  next0.style.setProperty('padding-top', '0px', 'important');
-                }
-              } catch(e) {}
-
-              // ✅ header 탐색 (titleEl부터 위로 올라가며 fixed/sticky 찾기)
-              var cur = titleEl;
-              var header = null;
-              for (var d=0; d<12 && cur; d++) {
-                var st = window.getComputedStyle(cur);
-                if (st && (st.position === 'fixed' || st.position === 'sticky')) { header = cur; break; }
-                cur = cur.parentElement;
-              }
-
-              if (header) {
-                // ✅ TOP 위치 갱신 가능하게
-                var desiredTop = 'calc(env(safe-area-inset-top) + ' + TOP_EXTRA + 'px)';
-                if (header.__dangbun_myplace_last_top__ !== desiredTop) {
-                  header.__dangbun_myplace_last_top__ = desiredTop;
-                  header.style.setProperty('top', desiredTop, 'important');
-                }
-                header.style.zIndex = '999999';
-
-                // ✅ 본문 paddingTop은 "헤더 높이만큼" 기본 확보
-                var h = header.getBoundingClientRect().height || 0;
-
-                var root = document.querySelector('#root') || document.querySelector('#__next') || document.querySelector('#app');
-                var main = document.querySelector('main');
-                var host = main || root || document.body;
-
-                host.style.setProperty('padding-top', Math.ceil(h) + 'px', 'important');
-                host.style.setProperty('box-sizing', 'border-box', 'important');
-              } else {
-                // fixed header 못 찾으면 title 자체에 여백 부여
-                titleEl.style.setProperty('margin-top', 'calc(env(safe-area-inset-top) + ' + TOP_EXTRA + 'px)', 'important');
-              }
-
-              // ✅ 흰 띠(첫 컨텐츠 위 간격) 제거 로직 적용
-              tightenFirstContentGap();
-            }
-
-            apply();
-            setTimeout(apply, 80);
-            setTimeout(apply, 200);
-            setTimeout(apply, 450);
-            setTimeout(apply, 800);
-
-            if (!window.__dangbun_myplace_ob__) {
-              window.__dangbun_myplace_ob__ = new MutationObserver(function() { apply(); });
-              window.__dangbun_myplace_ob__.observe(document.documentElement, { childList:true, subtree:true });
-            }
-          } catch(e) {}
-        })();
-    """.trimIndent()
-
-    view.evaluateJavascript(js, null)
-}
-
-
 private fun injectAddPlaceMemberSelectInsetFix(view: WebView) {
     val js =
         """
@@ -841,336 +738,4 @@ portal.style.bottom = (desiredDevicePx / scale) + 'px';
         """.trimIndent()
 
     view.evaluateJavascript(js, null)
-}
-
-private fun injectMyPlaceBottomCtaInsetFix(view: WebView) {
-    val js = """
-        (function() {
-          try {
-            function isMyPlace() {
-              var nodes = document.querySelectorAll('h1,h2,h3,header,div,span,p');
-              for (var i=0; i<nodes.length; i++) {
-                var t = (nodes[i].innerText || '').trim();
-                if (t === '내 플레이스') return true;
-              }
-              return false;
-            }
-
-            function toPx(v) {
-              var n = parseFloat((v || '0').toString().replace('px',''));
-              return isNaN(n) ? 0 : n;
-            }
-
-            function containsText(el, txt) {
-              if (!el) return false;
-              var t = (el.textContent || '').replace(/\s+/g,' ').trim();
-              return t.indexOf(txt) >= 0;
-            }
-
-            // ✅ "플레이스 추가" 텍스트가 button이 아니라 내부 span/div에 있을 수 있어서
-            //    문서 전체에서 텍스트 포함 요소를 찾고, 그 부모 중 fixed/sticky 하단 바를 우선 탐색
-            function findCtaWrapByText() {
-              var all = document.querySelectorAll('body *');
-              for (var i=0; i<all.length; i++) {
-                var el = all[i];
-                if (!containsText(el, '플레이스 추가')) continue;
-
-                var cur = el;
-                for (var d=0; d<10 && cur; d++) {
-                  var st = getComputedStyle(cur);
-                  if (st && (st.position === 'fixed' || st.position === 'sticky')) {
-                    var r = cur.getBoundingClientRect();
-                    // 화면 하단에 붙어 있고 가로폭이 충분한 바 형태만
-                    if (r.width >= window.innerWidth * 0.6 && r.bottom >= (window.innerHeight - 16)) {
-                      return cur;
-                    }
-                  }
-                  cur = cur.parentElement;
-                }
-              }
-              return null;
-            }
-
-            // ✅ 텍스트 탐색이 실패해도, "하단 고정 바" 자체를 형태로 찾아서 처리 (fallback)
-            function findBottomFixedBarFallback() {
-              var best = null;
-              var bestScore = -1;
-
-              var all = document.querySelectorAll('body *');
-              for (var i=0; i<all.length; i++) {
-                var el = all[i];
-                if (!el || !el.getBoundingClientRect) continue;
-
-                var st = getComputedStyle(el);
-                if (!(st.position === 'fixed' || st.position === 'sticky')) continue;
-
-                var r = el.getBoundingClientRect();
-                var vh = window.innerHeight || 0;
-                var vw = window.innerWidth || 0;
-
-                // 하단에 붙은 바 후보
-                var nearBottom = (r.bottom >= vh - 16);
-                if (!nearBottom) continue;
-
-                // 너무 작은 뱃지/토스트 제외
-                if (r.height < 44 || r.height > 180) continue;
-
-                // 폭이 큰 바만
-                if (r.width < vw * 0.6) continue;
-
-                // 점수: 화면에서 차지하는 면적
-                var score = r.width * r.height;
-
-                if (score > bestScore) {
-                  bestScore = score;
-                  best = el;
-                }
-              }
-              return best;
-            }
-            
-            function findCtaByTextAnyPosition() {
-              var best = null;
-              var bestScore = -1;
-
-              var all = document.querySelectorAll('body *');
-              for (var i=0; i<all.length; i++) {
-                var el = all[i];
-                if (!el || !el.getBoundingClientRect) continue;
-
-                var txt = (el.textContent || '').replace(/\s+/g,' ').trim();
-                if (txt.indexOf('플레이스 추가') < 0) continue;
-
-                var r = el.getBoundingClientRect();
-                var vh = window.innerHeight || 0;
-                var vw = window.innerWidth || 0;
-
-                // 버튼/바 형태 후보만 (너무 작은 텍스트 조각 제외)
-                if (r.height < 36 || r.height > 220) continue;
-                if (r.width < vw * 0.45) continue;
-
-                // 화면 하단에 가까울수록 우선 (겹침 문제는 하단 CTA가 원인)
-                var distToBottom = Math.abs(vh - r.bottom);
-                if (distToBottom > 200) continue;
-
-                // 점수: 하단에 더 가깝고 + 면적이 클수록
-                var score = (r.width * r.height) - (distToBottom * 50);
-
-                if (score > bestScore) {
-                  bestScore = score;
-                  best = el;
-                }
-              }
-
-              // 텍스트가 내부 span/div에만 있을 수 있으니, best를 찾았으면
-              // 부모로 5단계 정도 올라가며 "더 바(bar) 같은" 큰 박스를 선택
-              if (best) {
-                var cur = best;
-                var chosen = best;
-                for (var d=0; d<5 && cur && cur.parentElement; d++) {
-                  var p = cur.parentElement;
-                  var pr = p.getBoundingClientRect();
-                  var vw2 = window.innerWidth || 0;
-                  if (pr.width >= vw2 * 0.6 && pr.height >= 44 && pr.height <= 220) {
-                    chosen = p;
-                  }
-                  cur = p;
-                }
-                return chosen;
-              }
-
-              return null;
-            }
-
-            // ✅ "진짜 스크롤 컨테이너" 탐색 (overflow-y: auto/scroll)
-            function findRealScrollHost() {
-              var best = null;
-              var bestScore = -1;
-
-              var els = document.querySelectorAll('body *');
-              for (var i=0; i<els.length; i++) {
-                var el = els[i];
-                if (!el || !el.getBoundingClientRect) continue;
-
-                var st = getComputedStyle(el);
-                var oy = st.overflowY;
-
-                if (!(oy === 'auto' || oy === 'scroll')) continue;
-                if (el.scrollHeight <= el.clientHeight + 1) continue;
-
-                var r = el.getBoundingClientRect();
-                var vh = window.innerHeight || 0;
-                if (r.height < vh * 0.4) continue;
-
-                var score = r.height * r.width;
-                if (score > bestScore) {
-                  bestScore = score;
-                  best = el;
-                }
-              }
-
-              return best
-                || document.querySelector('main')
-                || document.querySelector('#root')
-                || document.scrollingElement
-                || document.documentElement
-                || document.body;
-            }
-
-            function applyOnce() {
-              if (!isMyPlace()) return { ok:false, reason:'not_myplace' };
-
-              var wrap = findCtaWrapByText() || findBottomFixedBarFallback();
-              var host = findRealScrollHost();
-
-              // ✅ 스케일 보정
-              var scale = (window.visualViewport && window.visualViewport.scale) ? window.visualViewport.scale : 1;
-
-              // ✅ CTA를 못 찾아도 기본 inset을 적용 (fallback)
-              var rect = wrap ? wrap.getBoundingClientRect() : null;
-              var h = rect ? (rect.height || 0) : 0;
-
-              // CTA 높이가 0이거나 wrap을 못 찾으면 "버튼 영역"을 기본값으로 가정
-              var usedFallback = false;
-              if (!wrap || h < 44) {
-              // 내 플레이스 리스트와 플레이스 추가 버튼 사이의 간격 조정
-                h = 48;            // 대략 버튼 높이(여유 포함)
-                usedFallback = true;
-              }
-
-              var extraDevicePx = 28; // 기기/네비게이션바 여유
-              var padCssPx = Math.ceil((h + extraDevicePx) / scale);
-
-              // 현재 padding-bottom보다 작으면 안 건드리고, 더 커야만 갱신
-              var curPb = toPx(getComputedStyle(host).paddingBottom);
-
-              function setPb(el, px) {
-                if (!el) return false;
-                var v = 'calc(' + px + 'px + env(safe-area-inset-bottom))';
-                // ✅ !important로 강제
-                el.style.setProperty('padding-bottom', v, 'important');
-                el.style.setProperty('box-sizing', 'border-box', 'important');
-                return true;
-              }
-
-              var applied = [];
-
-              function applyToLikelyScrollContainers(px) {
-                var vh = window.innerHeight || 0;
-                var vw = window.innerWidth || 0;
-
-                // 1) 기본 후보들
-                var base = [
-                  host,
-                  document.scrollingElement,
-                  document.documentElement,
-                  document.body,
-                  document.getElementById('root'),
-                  document.querySelector('main')
-                ];
-
-                for (var i = 0; i < base.length; i++) {
-                  if (setPb(base[i], px)) applied.push('base#' + i);
-                }
-
-                // 2) "실제로 스크롤되는" 컨테이너 전수 조사
-                //    (overflowY가 auto/scroll이 아니어도 scrollHeight가 크면 후보로 봄)
-                var els = document.querySelectorAll('body *');
-                for (var j = 0; j < els.length; j++) {
-                  var el = els[j];
-                  if (!el || !el.getBoundingClientRect) continue;
-
-                  var r = el.getBoundingClientRect();
-
-                  // 너무 작은 요소 제외
-                  if (r.height < vh * 0.45) continue;
-                  if (r.width < vw * 0.6) continue;
-
-                  // 실제로 스크롤 가능한지(내용이 더 긴지)
-                  if (el.scrollHeight <= el.clientHeight + 1) continue;
-
-                  if (setPb(el, px)) applied.push('scrollCandidate');
-                }
-              }
-
-              function ensureSpacer(el, px) {
-                if (!el) return false;
-
-                var id = '__dangbun_cta_spacer__';
-                var spacer = el.querySelector ? el.querySelector('#' + id) : null;
-
-                if (!spacer) {
-                  spacer = document.createElement('div');
-                  spacer.id = id;
-                  spacer.style.width = '100%';
-                  spacer.style.pointerEvents = 'none';
-                  el.appendChild(spacer);
-                }
-
-                spacer.style.height = px + 'px';
-                spacer.style.minHeight = px + 'px';
-                return true;
-              }
-
-              // ✅ 실행
-              applyToLikelyScrollContainers(padCssPx);
-
-              // ✅ 스페이서까지 박아주기(마지막 아이템이 CTA 아래로 들어가도 스크롤로 빠져나오게)
-              ensureSpacer(host, padCssPx) && applied.push('spacer@host');
-              ensureSpacer(document.scrollingElement, padCssPx) && applied.push('spacer@scrollingElement');
-
-              var root2 = document.getElementById('root');
-              ensureSpacer(root2, padCssPx) && applied.push('spacer@root');
-
-              // (선택) 높이 계산 깨지는 케이스 방지용
-              document.documentElement.style.setProperty('min-height', '100%', 'important');
-              document.body.style.setProperty('min-height', '100%', 'important');
-
-
-            return {
-              ok:true,
-              usedFallback: usedFallback,
-              foundWrap: !!wrap,
-              appliedTo: applied,
-              scale: scale,
-              padCssPx: padCssPx,
-              ctaH: h,
-              hostTag: host ? host.tagName : null,
-              hostId: host ? host.id : null,
-              hostClass: host ? (host.className || null) : null
-            };
-            }
-
-            // ✅ 렌더 타이밍이 늦는 케이스 대비: 더 오래 재시도
-            var r0 = applyOnce();
-            setTimeout(applyOnce, 80);
-            setTimeout(applyOnce, 200);
-            setTimeout(applyOnce, 450);
-            setTimeout(applyOnce, 800);
-            setTimeout(applyOnce, 1300);
-            setTimeout(applyOnce, 2000);
-
-            if (!window.__dangbun_myplace_cta_ob_v3__) {
-              window.__dangbun_myplace_cta_ob_v3__ = new MutationObserver(function(){ applyOnce(); });
-              window.__dangbun_myplace_cta_ob_v3__.observe(document.documentElement, { childList:true, subtree:true });
-            }
-
-            if (!window.__dangbun_myplace_cta_resize_v3__) {
-              window.__dangbun_myplace_cta_resize_v3__ = true;
-              window.addEventListener('resize', function(){ setTimeout(applyOnce, 0); });
-              if (window.visualViewport) {
-                window.visualViewport.addEventListener('resize', function(){ setTimeout(applyOnce, 0); });
-              }
-            }
-
-            return JSON.stringify(r0);
-          } catch(e) {
-            return JSON.stringify({ ok:false, reason:'js_error', msg: String(e && e.message) });
-          }
-        })();
-    """.trimIndent()
-
-    view.evaluateJavascript(js) { result ->
-        Log.d(TAG, "WV_MYPLACE_CTA_INSET_V3=$result")
-    }
 }
