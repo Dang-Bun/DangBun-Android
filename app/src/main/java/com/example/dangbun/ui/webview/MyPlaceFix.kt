@@ -8,7 +8,7 @@ internal object MyPlaceFix {
             (function() {
               try {
                 var GRAY_BG = '#F5F6F8'; 
-                var styleId = '__db_final_ordered_layout_fix__';
+                var styleId = '__db_final_ordered_layout_fix_v3__';
                 
                 // ✅ [핵심] style 태그가 있으면 갱신(덮어쓰기), 없으면 생성
                 var style = document.getElementById(styleId);
@@ -25,18 +25,7 @@ internal object MyPlaceFix {
                     margin: 0 !important;
                     padding: 0 !important;
                     display: block !important;
-                    min-height: 100vh !important; /* ✅ 하단 빈영역까지 회색으로 채움 */
-                  }
-
-                  /* ✅ 리스트가 버튼과 겹치지 않게 하단 여백 확보 */
-                  .db-list-safe-bottom {
-                    padding-bottom: 110px !important; /* 🔧 여기 수치만 조절 */
-                    box-sizing: border-box !important;
-                  }
-
-                  /* ✅ 어떤 컨테이너가 실제 스크롤이든 배경을 회색으로 강제 */
-                  body, #root, #__next, main {
-                    background: ${'$'}{GRAY_BG} !important;
+                    min-height: 100vh !important;
                   }
 
                   /* 2. 상단 헤더 박스 (정중앙 유지) */
@@ -84,28 +73,19 @@ internal object MyPlaceFix {
                     position: relative !important;
                     display: block !important;
                     width: 100% !important;
-
-                    /* ✅ 화면처럼 좌우 여백만 확보 */
-                    padding: 0 16px !important;
+                    padding: 18px 16px 0 16px !important;
                     box-sizing: border-box !important;
-
-                    margin: 10px 0 20px 0 !important;
+                    margin: 0 0 20px 0 !important;
                     transform: none !important;
                   }
 
-
-                  /* ✅ [핵심] 버튼 크기 강제 제거(원래 웹 스타일로 복원) */
+                  /* ✅ 버튼 크기 강제 제거(원래 웹 스타일로 복원) */
                   .db-add-btn-wrap button {
                     position: static !important;
-
-                    /* ✅ 버튼을 “원래처럼 크게” */
                     width: 100% !important;
                     max-width: none !important;
-
-                    /* 혹시 button이 inline/auto라면 대비 */
                     display: block !important;
                   }
-
                 `;
 
                 function apply() {
@@ -113,68 +93,27 @@ internal object MyPlaceFix {
                   var isMyPlace = (path.indexOf('MyPlace') >= 0 || path.indexOf('myplace') >= 0 || document.body.innerText.indexOf('내 플레이스') >= 0);
                   if (!isMyPlace) return;
                   
-                  // ✅ (추가) "화면을 덮는 큰 흰 wrapper"가 있으면 회색으로 강제
-                  // ✅ (교체) 최상단/전체 트리에서 "화면을 덮는 흰 배경 wrapper"를 잡아서 회색으로 강제
+                  // 배경색 강제 적용 (화면 덮는 흰색 박스 제거)
                   try {
-                    function isWhiteish(bg) {
-                      if (!bg) return false;
-                      // rgb(255, 255, 255) / rgba(255,255,255,1) 등
-                      return bg === 'rgb(255, 255, 255)' || bg.indexOf('rgba(255, 255, 255') === 0;
-                    }
-
-                    // 0) html/body 자체도 inline으로 한번 더 강제 (CSS보다 우선될 때가 많음)
-                    try {
-                      document.documentElement.style.setProperty('background-color', GRAY_BG, 'important');
-                      document.body.style.setProperty('background-color', GRAY_BG, 'important');
-                      document.body.style.setProperty('background', GRAY_BG, 'important');
-                    } catch(e) {}
-
-                    var best = null;
-                    var bestArea = 0;
-
-                    // 1) 후보 범위를 "main"이 아니라 body/#root/#__next 전체로 확장
-                    var scopes = [
-                      document.body,
-                      document.querySelector('#root'),
-                      document.querySelector('#__next'),
-                      document.querySelector('main')
-                    ].filter(Boolean);
-
+                    document.documentElement.style.setProperty('background-color', GRAY_BG, 'important');
+                    document.body.style.setProperty('background-color', GRAY_BG, 'important');
+                    
+                    var scopes = [document.body, document.querySelector('#root'), document.querySelector('main')].filter(Boolean);
                     for (var s = 0; s < scopes.length; s++) {
-                      var scope = scopes[s];
-
-                      // 너무 많은 노드 탐색 방지: div/section/article만
-                      var candidates = scope.querySelectorAll('div, section, article');
+                      var candidates = scopes[s].querySelectorAll('div, section, article');
                       for (var i2 = 0; i2 < candidates.length; i2++) {
                         var el = candidates[i2];
-                        if (!el || !el.getBoundingClientRect) continue;
-
                         var rect = el.getBoundingClientRect();
-
-                        // "화면을 덮는" 조건(가로 거의 전체 + 세로 상당 부분)
-                        if (rect.width < window.innerWidth * 0.92) continue;
-                        if (rect.height < window.innerHeight * 0.60) continue;
-
-                        var st = window.getComputedStyle(el);
-                        if (!isWhiteish(st.backgroundColor)) continue;
-
-                        // fixed overlay 같은 것도 잡히게 area 최대를 선택
-                        var area = rect.width * rect.height;
-                        if (area > bestArea) {
-                          bestArea = area;
-                          best = el;
+                        if (rect.width > window.innerWidth * 0.92 && rect.height > window.innerHeight * 0.60) {
+                          var st = window.getComputedStyle(el);
+                          if (st.backgroundColor === 'rgb(255, 255, 255)') {
+                             el.style.setProperty('background', GRAY_BG, 'important');
+                             el.style.setProperty('background-color', GRAY_BG, 'important');
+                          }
                         }
                       }
                     }
-
-                    if (best) {
-                      best.style.setProperty('background', GRAY_BG, 'important');
-                      best.style.setProperty('background-color', GRAY_BG, 'important');
-                      best.style.setProperty('min-height', '100vh', 'important');
-                      best.style.setProperty('width', '100%', 'important');
-                    }
                   } catch(e) {}
-
 
                   // A. 헤더 영역 정리
                   var tags = document.querySelectorAll('h1,h2,h3,header,div,span');
@@ -215,27 +154,68 @@ internal object MyPlaceFix {
                     }
                   }
 
-                  // C. 하단 버튼 처리 (버블 바로 뒤에 삽입)
-                  // C. 하단 버튼 처리 (버블 바로 뒤에 삽입) + ✅ 폭 강제(작은 pill 방지)
+                  // C. 하단 버튼 처리 및 리스트 하단 여백 추가
                   var btns = document.querySelectorAll('button');
                   for (var k = 0; k < btns.length; k++) {
                     var btn = btns[k];
                     if ((btn.innerText || '').indexOf('플레이스 추가') >= 0) {
-
-                      // ✅ 1) 버튼 자체를 "가로 꽉" 강제 (inline style이 제일 확실)
+                      
+                      // 1. 리스트 하단 여백(padding-bottom) 늘리기
                       try {
-                        btn.style.setProperty('width', '100%', 'important');
-                        btn.style.setProperty('min-width', '100%', 'important');
-                        btn.style.setProperty('max-width', 'none', 'important');
-                        btn.style.setProperty('display', 'block', 'important');
-                        btn.style.setProperty('box-sizing', 'border-box', 'important');
+                        function findScrollHost(seed) {
+                          // ✅ 1) 가장 우선: 문서 스크롤 자체가 있으면 그걸 사용
+                          var docEl = document.scrollingElement || document.documentElement;
+                          if (docEl && docEl.scrollHeight > docEl.clientHeight + 10) return docEl;
+
+                          // ✅ 2) 전역에서 "스크롤 가능한 큰 컨테이너"를 찾아서 선택
+                          var best = null;
+                          var bestScore = 0;
+
+                          var nodes = document.querySelectorAll('body *');
+                          for (var i = 0; i < nodes.length; i++) {
+                            var el = nodes[i];
+                            if (!el || !el.getBoundingClientRect) continue;
+
+                            var st = window.getComputedStyle(el);
+                            var oy = st ? st.overflowY : '';
+                            if (oy !== 'auto' && oy !== 'scroll') continue;
+
+                            var ch = el.clientHeight || 0;
+                            var sh = el.scrollHeight || 0;
+                            if (sh <= ch + 10) continue;
+
+                            // 화면 높이의 절반 이상 차지하는 "메인 스크롤"을 우선
+                            if (ch < window.innerHeight * 0.5) continue;
+
+                            // 점수: (스크롤 가능한 양) * (컨테이너 크기)
+                            var score = (sh - ch) * ch;
+                            if (score > bestScore) {
+                              bestScore = score;
+                              best = el;
+                            }
+                          }
+
+                          return best || document.querySelector('main') || document.body;
+                        }
+
+
+                        // ✅ 기존(24px)에서 120px로 대폭 늘려서 여유 공간 확보
+                        var btnH = Math.ceil(btn.getBoundingClientRect().height || 56);
+                        var safePx = (btnH + 220); 
+                        
+                        var host = findScrollHost(btn);
+                        if (host) {
+                          host.style.setProperty(
+                            'padding-bottom',
+                            'calc(' + safePx + 'px + env(safe-area-inset-bottom))',
+                            'important'
+                          );
+                          host.style.setProperty('box-sizing', 'border-box', 'important');
+                        }
                       } catch(e) {}
 
-                      // ✅ 2) 감싸는 래퍼(부모)가 content 폭이면 버튼이 계속 pill이 됨 → 부모도 100%
+                      // 2. 버튼 래퍼 처리 (크기 보존)
                       var wrap = btn.parentElement;
-
-                      // 혹시 button 상위에 한 겹 더 감싸져 있을 수 있어서 "버튼 폭이 안 늘어나는" 케이스 대비
-                      // (버튼 부모 폭이 너무 작으면 한 단계 더 위로 올라가서 wrap 후보를 잡음)
                       try {
                         if (wrap) {
                           var r = wrap.getBoundingClientRect();
@@ -249,30 +229,31 @@ internal object MyPlaceFix {
                         wrap.classList.add('db-add-btn-wrap');
                       }
 
-                      // ✅ wrap도 가로 꽉 + 좌우 여백만
+                      /* ✅ [추가] 플레이스 추가 버튼이 떠 있는 고정 영역을 아래로 내림 (겹침 완화) */
                       try {
-                        if (wrap) {
-                          wrap.style.setProperty('width', '100%', 'important');
-                          wrap.style.setProperty('display', 'block', 'important');
-                          wrap.style.setProperty('padding', '0 16px', 'important');
-                          wrap.style.setProperty('box-sizing', 'border-box', 'important');
+                        // 버튼/래퍼 기준으로 위로 올라가며 fixed/sticky 컨테이너 탐색
+                        var fixedHost = wrap || btn;
+                        for (var t = 0; t < 6 && fixedHost; t++) {
+                          var st = window.getComputedStyle(fixedHost);
+                          if (st && (st.position === 'fixed' || st.position === 'sticky')) break;
+                          fixedHost = fixedHost.parentElement;
                         }
-                      } catch(e) {}
 
-                      // ✅ 3) wrap 상위 컨테이너가 flex(center)면 wrap이 줄어드는 경우가 있음 → 상위도 "stretch"
-                      try {
-                        var p = wrap ? wrap.parentElement : null;
-                        for (var up = 0; up < 2 && p; up++) {
-                          var st = window.getComputedStyle(p);
-                          if (st && st.display === 'flex') {
-                            p.style.setProperty('align-items', 'stretch', 'important');
-                          }
-                          p.style.setProperty('width', '100%', 'important');
-                          p = p.parentElement;
+                        // 찾았으면 "바닥에 붙이기"
+                        if (fixedHost) {
+                          fixedHost.style.setProperty('bottom', '0px', 'important');
+                          fixedHost.style.setProperty('margin-bottom', '0px', 'important');
+                          fixedHost.style.setProperty('transform', 'none', 'important');
+
+                          // 혹시 safe-area 때문에 위로 떠있는 케이스는 padding으로만 처리
+                          fixedHost.style.setProperty('padding-bottom', 'env(safe-area-inset-bottom)', 'important');
                         }
-                      } catch(e) {}
 
-                      // ✅ 4) 위치 이동(버블 뒤)
+                        // 버튼 자체도 불필요한 여백 제거
+                        btn.style.setProperty('margin-bottom', '0px', 'important');
+                      } catch(e) {}                      
+                      
+                      // 3. 위치 이동 (버블 뒤)
                       if (bubbleEl && bubbleEl.parentNode && wrap) {
                         bubbleEl.parentNode.insertBefore(wrap, bubbleEl.nextSibling);
                       } else if (wrap) {
