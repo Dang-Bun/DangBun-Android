@@ -164,7 +164,7 @@ fun DangbunWebViewScreen(
                     }
 
                     injectMyPlaceTopInsetFix(view)
-
+                    injectMyPlaceBottomCtaInsetFix(view)
                     injectAddPlaceMemberSelectInsetFix(view)
                 }
 
@@ -673,7 +673,6 @@ private fun injectMyPlaceTopInsetFix(view: WebView) {
 }
 
 
-
 private fun injectAddPlaceMemberSelectInsetFix(view: WebView) {
     val js =
         """
@@ -844,3 +843,334 @@ portal.style.bottom = (desiredDevicePx / scale) + 'px';
     view.evaluateJavascript(js, null)
 }
 
+private fun injectMyPlaceBottomCtaInsetFix(view: WebView) {
+    val js = """
+        (function() {
+          try {
+            function isMyPlace() {
+              var nodes = document.querySelectorAll('h1,h2,h3,header,div,span,p');
+              for (var i=0; i<nodes.length; i++) {
+                var t = (nodes[i].innerText || '').trim();
+                if (t === '내 플레이스') return true;
+              }
+              return false;
+            }
+
+            function toPx(v) {
+              var n = parseFloat((v || '0').toString().replace('px',''));
+              return isNaN(n) ? 0 : n;
+            }
+
+            function containsText(el, txt) {
+              if (!el) return false;
+              var t = (el.textContent || '').replace(/\s+/g,' ').trim();
+              return t.indexOf(txt) >= 0;
+            }
+
+            // ✅ "플레이스 추가" 텍스트가 button이 아니라 내부 span/div에 있을 수 있어서
+            //    문서 전체에서 텍스트 포함 요소를 찾고, 그 부모 중 fixed/sticky 하단 바를 우선 탐색
+            function findCtaWrapByText() {
+              var all = document.querySelectorAll('body *');
+              for (var i=0; i<all.length; i++) {
+                var el = all[i];
+                if (!containsText(el, '플레이스 추가')) continue;
+
+                var cur = el;
+                for (var d=0; d<10 && cur; d++) {
+                  var st = getComputedStyle(cur);
+                  if (st && (st.position === 'fixed' || st.position === 'sticky')) {
+                    var r = cur.getBoundingClientRect();
+                    // 화면 하단에 붙어 있고 가로폭이 충분한 바 형태만
+                    if (r.width >= window.innerWidth * 0.6 && r.bottom >= (window.innerHeight - 16)) {
+                      return cur;
+                    }
+                  }
+                  cur = cur.parentElement;
+                }
+              }
+              return null;
+            }
+
+            // ✅ 텍스트 탐색이 실패해도, "하단 고정 바" 자체를 형태로 찾아서 처리 (fallback)
+            function findBottomFixedBarFallback() {
+              var best = null;
+              var bestScore = -1;
+
+              var all = document.querySelectorAll('body *');
+              for (var i=0; i<all.length; i++) {
+                var el = all[i];
+                if (!el || !el.getBoundingClientRect) continue;
+
+                var st = getComputedStyle(el);
+                if (!(st.position === 'fixed' || st.position === 'sticky')) continue;
+
+                var r = el.getBoundingClientRect();
+                var vh = window.innerHeight || 0;
+                var vw = window.innerWidth || 0;
+
+                // 하단에 붙은 바 후보
+                var nearBottom = (r.bottom >= vh - 16);
+                if (!nearBottom) continue;
+
+                // 너무 작은 뱃지/토스트 제외
+                if (r.height < 44 || r.height > 180) continue;
+
+                // 폭이 큰 바만
+                if (r.width < vw * 0.6) continue;
+
+                // 점수: 화면에서 차지하는 면적
+                var score = r.width * r.height;
+
+                if (score > bestScore) {
+                  bestScore = score;
+                  best = el;
+                }
+              }
+              return best;
+            }
+            
+            function findCtaByTextAnyPosition() {
+              var best = null;
+              var bestScore = -1;
+
+              var all = document.querySelectorAll('body *');
+              for (var i=0; i<all.length; i++) {
+                var el = all[i];
+                if (!el || !el.getBoundingClientRect) continue;
+
+                var txt = (el.textContent || '').replace(/\s+/g,' ').trim();
+                if (txt.indexOf('플레이스 추가') < 0) continue;
+
+                var r = el.getBoundingClientRect();
+                var vh = window.innerHeight || 0;
+                var vw = window.innerWidth || 0;
+
+                // 버튼/바 형태 후보만 (너무 작은 텍스트 조각 제외)
+                if (r.height < 36 || r.height > 220) continue;
+                if (r.width < vw * 0.45) continue;
+
+                // 화면 하단에 가까울수록 우선 (겹침 문제는 하단 CTA가 원인)
+                var distToBottom = Math.abs(vh - r.bottom);
+                if (distToBottom > 200) continue;
+
+                // 점수: 하단에 더 가깝고 + 면적이 클수록
+                var score = (r.width * r.height) - (distToBottom * 50);
+
+                if (score > bestScore) {
+                  bestScore = score;
+                  best = el;
+                }
+              }
+
+              // 텍스트가 내부 span/div에만 있을 수 있으니, best를 찾았으면
+              // 부모로 5단계 정도 올라가며 "더 바(bar) 같은" 큰 박스를 선택
+              if (best) {
+                var cur = best;
+                var chosen = best;
+                for (var d=0; d<5 && cur && cur.parentElement; d++) {
+                  var p = cur.parentElement;
+                  var pr = p.getBoundingClientRect();
+                  var vw2 = window.innerWidth || 0;
+                  if (pr.width >= vw2 * 0.6 && pr.height >= 44 && pr.height <= 220) {
+                    chosen = p;
+                  }
+                  cur = p;
+                }
+                return chosen;
+              }
+
+              return null;
+            }
+
+            // ✅ "진짜 스크롤 컨테이너" 탐색 (overflow-y: auto/scroll)
+            function findRealScrollHost() {
+              var best = null;
+              var bestScore = -1;
+
+              var els = document.querySelectorAll('body *');
+              for (var i=0; i<els.length; i++) {
+                var el = els[i];
+                if (!el || !el.getBoundingClientRect) continue;
+
+                var st = getComputedStyle(el);
+                var oy = st.overflowY;
+
+                if (!(oy === 'auto' || oy === 'scroll')) continue;
+                if (el.scrollHeight <= el.clientHeight + 1) continue;
+
+                var r = el.getBoundingClientRect();
+                var vh = window.innerHeight || 0;
+                if (r.height < vh * 0.4) continue;
+
+                var score = r.height * r.width;
+                if (score > bestScore) {
+                  bestScore = score;
+                  best = el;
+                }
+              }
+
+              return best
+                || document.querySelector('main')
+                || document.querySelector('#root')
+                || document.scrollingElement
+                || document.documentElement
+                || document.body;
+            }
+
+            function applyOnce() {
+              if (!isMyPlace()) return { ok:false, reason:'not_myplace' };
+
+              var wrap = findCtaWrapByText() || findBottomFixedBarFallback();
+              var host = findRealScrollHost();
+
+              // ✅ 스케일 보정
+              var scale = (window.visualViewport && window.visualViewport.scale) ? window.visualViewport.scale : 1;
+
+              // ✅ CTA를 못 찾아도 기본 inset을 적용 (fallback)
+              var rect = wrap ? wrap.getBoundingClientRect() : null;
+              var h = rect ? (rect.height || 0) : 0;
+
+              // CTA 높이가 0이거나 wrap을 못 찾으면 "버튼 영역"을 기본값으로 가정
+              var usedFallback = false;
+              if (!wrap || h < 44) {
+              // 내 플레이스 리스트와 플레이스 추가 버튼 사이의 간격 조정
+                h = 48;            // 대략 버튼 높이(여유 포함)
+                usedFallback = true;
+              }
+
+              var extraDevicePx = 28; // 기기/네비게이션바 여유
+              var padCssPx = Math.ceil((h + extraDevicePx) / scale);
+
+              // 현재 padding-bottom보다 작으면 안 건드리고, 더 커야만 갱신
+              var curPb = toPx(getComputedStyle(host).paddingBottom);
+
+              function setPb(el, px) {
+                if (!el) return false;
+                var v = 'calc(' + px + 'px + env(safe-area-inset-bottom))';
+                // ✅ !important로 강제
+                el.style.setProperty('padding-bottom', v, 'important');
+                el.style.setProperty('box-sizing', 'border-box', 'important');
+                return true;
+              }
+
+              var applied = [];
+
+              function applyToLikelyScrollContainers(px) {
+                var vh = window.innerHeight || 0;
+                var vw = window.innerWidth || 0;
+
+                // 1) 기본 후보들
+                var base = [
+                  host,
+                  document.scrollingElement,
+                  document.documentElement,
+                  document.body,
+                  document.getElementById('root'),
+                  document.querySelector('main')
+                ];
+
+                for (var i = 0; i < base.length; i++) {
+                  if (setPb(base[i], px)) applied.push('base#' + i);
+                }
+
+                // 2) "실제로 스크롤되는" 컨테이너 전수 조사
+                //    (overflowY가 auto/scroll이 아니어도 scrollHeight가 크면 후보로 봄)
+                var els = document.querySelectorAll('body *');
+                for (var j = 0; j < els.length; j++) {
+                  var el = els[j];
+                  if (!el || !el.getBoundingClientRect) continue;
+
+                  var r = el.getBoundingClientRect();
+
+                  // 너무 작은 요소 제외
+                  if (r.height < vh * 0.45) continue;
+                  if (r.width < vw * 0.6) continue;
+
+                  // 실제로 스크롤 가능한지(내용이 더 긴지)
+                  if (el.scrollHeight <= el.clientHeight + 1) continue;
+
+                  if (setPb(el, px)) applied.push('scrollCandidate');
+                }
+              }
+
+              function ensureSpacer(el, px) {
+                if (!el) return false;
+
+                var id = '__dangbun_cta_spacer__';
+                var spacer = el.querySelector ? el.querySelector('#' + id) : null;
+
+                if (!spacer) {
+                  spacer = document.createElement('div');
+                  spacer.id = id;
+                  spacer.style.width = '100%';
+                  spacer.style.pointerEvents = 'none';
+                  el.appendChild(spacer);
+                }
+
+                spacer.style.height = px + 'px';
+                spacer.style.minHeight = px + 'px';
+                return true;
+              }
+
+              // ✅ 실행
+              applyToLikelyScrollContainers(padCssPx);
+
+              // ✅ 스페이서까지 박아주기(마지막 아이템이 CTA 아래로 들어가도 스크롤로 빠져나오게)
+              ensureSpacer(host, padCssPx) && applied.push('spacer@host');
+              ensureSpacer(document.scrollingElement, padCssPx) && applied.push('spacer@scrollingElement');
+
+              var root2 = document.getElementById('root');
+              ensureSpacer(root2, padCssPx) && applied.push('spacer@root');
+
+              // (선택) 높이 계산 깨지는 케이스 방지용
+              document.documentElement.style.setProperty('min-height', '100%', 'important');
+              document.body.style.setProperty('min-height', '100%', 'important');
+
+
+            return {
+              ok:true,
+              usedFallback: usedFallback,
+              foundWrap: !!wrap,
+              appliedTo: applied,
+              scale: scale,
+              padCssPx: padCssPx,
+              ctaH: h,
+              hostTag: host ? host.tagName : null,
+              hostId: host ? host.id : null,
+              hostClass: host ? (host.className || null) : null
+            };
+            }
+
+            // ✅ 렌더 타이밍이 늦는 케이스 대비: 더 오래 재시도
+            var r0 = applyOnce();
+            setTimeout(applyOnce, 80);
+            setTimeout(applyOnce, 200);
+            setTimeout(applyOnce, 450);
+            setTimeout(applyOnce, 800);
+            setTimeout(applyOnce, 1300);
+            setTimeout(applyOnce, 2000);
+
+            if (!window.__dangbun_myplace_cta_ob_v3__) {
+              window.__dangbun_myplace_cta_ob_v3__ = new MutationObserver(function(){ applyOnce(); });
+              window.__dangbun_myplace_cta_ob_v3__.observe(document.documentElement, { childList:true, subtree:true });
+            }
+
+            if (!window.__dangbun_myplace_cta_resize_v3__) {
+              window.__dangbun_myplace_cta_resize_v3__ = true;
+              window.addEventListener('resize', function(){ setTimeout(applyOnce, 0); });
+              if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', function(){ setTimeout(applyOnce, 0); });
+              }
+            }
+
+            return JSON.stringify(r0);
+          } catch(e) {
+            return JSON.stringify({ ok:false, reason:'js_error', msg: String(e && e.message) });
+          }
+        })();
+    """.trimIndent()
+
+    view.evaluateJavascript(js) { result ->
+        Log.d(TAG, "WV_MYPLACE_CTA_INSET_V3=$result")
+    }
+}
