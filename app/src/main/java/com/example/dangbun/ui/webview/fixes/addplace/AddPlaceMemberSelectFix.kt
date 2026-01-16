@@ -1,4 +1,5 @@
-package com.example.dangbun.ui.webview
+// “매니저/멤버 선택 화면”처럼 ‘다음’ 버튼이 있는 화면
+package com.example.dangbun.ui.webview.fixes.addplace
 
 import android.webkit.WebView
 

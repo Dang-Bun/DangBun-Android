@@ -1,6 +1,7 @@
-package com.example.dangbun.ui.webview
+package com.example.dangbun.ui.webview.fixes.splash
 
 import android.webkit.WebView
+import com.example.dangbun.ui.webview.SPLASH_BG_HEX
 
 internal object SplashFix {
     internal fun injectSplashFix(view: WebView) {

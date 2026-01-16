@@ -1,4 +1,4 @@
-package com.example.dangbun.ui.webview
+package com.example.dangbun.ui.webview.fixes.common
 
 import android.webkit.WebView
 

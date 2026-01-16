@@ -1,9 +1,14 @@
 package com.example.dangbun.ui.webview
 
 import android.webkit.WebView
+import com.example.dangbun.ui.webview.fixes.addplace.AddPlaceMemberSelectFix
+import com.example.dangbun.ui.webview.fixes.common.CommonModalFix
+import com.example.dangbun.ui.webview.fixes.kakao.KakaoFix
+import com.example.dangbun.ui.webview.fixes.myplace.MyPlaceFix
+import com.example.dangbun.ui.webview.fixes.splash.SplashFix
 
 internal fun injectMyPlaceUnifiedFix(view: WebView) {
-    MyPlaceFix.injectMyPlaceUnifiedFix(view)
+    MyPlaceFix.inject(view)
 }
 
 internal fun injectCommonFixes(view: WebView) {
