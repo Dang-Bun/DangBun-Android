@@ -22,20 +22,18 @@ internal object MyPlaceAddFix {
             var STYLE_ID = '__db_addplace_css_hack_final__';
             var MOVED_BTN_CLASS = 'db-next-btn-moved-to-body'; // 납치한 버튼 식별용
 
-            // ✅ 스크롤락(스크롤 기능 제거) 설치 여부
+            // ✅ 스크롤락 설치 여부
             var __dbScrollLockInstalled = false;
             var __dbScrollLockGuard = false;
 
+            // ✅ AddPlace 판단: URL만 사용 (SPA DOM 잔상 오판 방지)
             function isAddPlace() {
               var path = (location.pathname || '').toLowerCase();
-              if (path.indexOf('addplace') >= 0) return true;
-
-              var text = document.body ? document.body.innerText : '';
-              return (text.replace(/\s/g,'').indexOf('어떤목적으로사용하시나요') >= 0);
+              return (path.indexOf('addplace') >= 0);
             }
 
             // ==========================================
-            // [스크롤 기능 제거] (레이아웃은 건드리지 않음)
+            // [스크롤 기능 제거] (AddPlace에서만)
             // ==========================================
             function installScrollLock() {
               if (__dbScrollLockInstalled) return;
@@ -43,8 +41,9 @@ internal object MyPlaceAddFix {
 
               try { window.scrollTo(0, 0); } catch(e) {}
 
-              // ✅ touchmove / wheel 차단
               function prevent(e) {
+                // ✅ AddPlace 아닐 때는 절대 막지 않음 (리스너가 남아도 스크롤 살림)
+                if (!isAddPlace()) return true;
                 try { e.preventDefault(); } catch(err) {}
                 return false;
               }
@@ -54,21 +53,21 @@ internal object MyPlaceAddFix {
                 document.addEventListener('touchmove', prevent, { passive: false });
                 document.addEventListener('wheel', prevent, { passive: false });
               } catch(e) {
-                // 일부 구형 환경 fallback
                 try { document.addEventListener('touchmove', prevent); } catch(e2) {}
                 try { document.addEventListener('wheel', prevent); } catch(e3) {}
               }
 
-              // ✅ 혹시 스크롤이 발생하면 0으로 되돌림(가드로 무한루프 방지)
               window.__dbAddPlaceScrollHandler__ = function() {
+                // ✅ AddPlace 아닐 때는 스크롤 강제 고정도 하지 않음
+                if (!isAddPlace()) return;
+
                 if (__dbScrollLockGuard) return;
                 __dbScrollLockGuard = true;
                 try { window.scrollTo(0, 0); } catch(e) {}
                 __dbScrollLockGuard = false;
               };
-              try { window.addEventListener('scroll', window.__dbAddPlaceScrollHandler__, { passive: true }); } catch(e) {
-                try { window.addEventListener('scroll', window.__dbAddPlaceScrollHandler__); } catch(e2) {}
-              }
+              try { window.addEventListener('scroll', window.__dbAddPlaceScrollHandler__, { passive: true }); }
+              catch(e) { try { window.addEventListener('scroll', window.__dbAddPlaceScrollHandler__); } catch(e2) {} }
             }
 
             function removeScrollLock() {
@@ -90,6 +89,39 @@ internal object MyPlaceAddFix {
             }
 
             // ==========================================
+            // ✅ AddPlace 밖으로 나가면 스크롤 차단 흔적 강제 원복
+            // ==========================================
+            function globalTargets() {
+              var out = [];
+              try { out.push(document.documentElement); } catch(e) {}
+              try { out.push(document.body); } catch(e) {}
+              try { var r = document.querySelector('#root'); if (r) out.push(r); } catch(e) {}
+              try { var n = document.querySelector('#__next'); if (n) out.push(n); } catch(e) {}
+              try { var m = document.querySelector('main'); if (m) out.push(m); } catch(e) {}
+
+              var uniq = [];
+              for (var i=0; i<out.length; i++) {
+                if (out[i] && uniq.indexOf(out[i]) < 0) uniq.push(out[i]);
+              }
+              return uniq;
+            }
+
+            function forceRestoreScroll() {
+              try {
+                var ts = globalTargets();
+                for (var i=0; i<ts.length; i++) {
+                  var t = ts[i];
+                  try { t.style.removeProperty('overflow-y'); } catch(e) {}
+                  try { t.style.removeProperty('overflow-x'); } catch(e) {}
+                  try { t.style.removeProperty('overflow'); } catch(e) {}
+                  try { t.style.removeProperty('touch-action'); } catch(e) {}
+                  try { t.style.removeProperty('overscroll-behavior'); } catch(e) {}
+                  try { t.style.removeProperty('-webkit-overflow-scrolling'); } catch(e) {}
+                }
+              } catch(e) {}
+            }
+
+            // ==========================================
             // [1] 스타일 주입 및 제거
             // ==========================================
             function applyStyles() {
@@ -98,7 +130,6 @@ internal object MyPlaceAddFix {
                 var style = document.createElement('style');
                 style.id = STYLE_ID;
                 style.textContent = `
-                    /* 이 화면에서만 적용될 레이아웃 초기화 */
                     html, body, #root, #__next, main {
                         display: block !important;
                         height: auto !important;
@@ -110,14 +141,13 @@ internal object MyPlaceAddFix {
 
                         overflow-x: hidden !important;
 
-                        /* ✅ 스크롤 기능 제거 */
+                        /* ✅ AddPlace에서만 스크롤 제거 */
                         overflow-y: hidden !important;
                         overscroll-behavior: none !important;
                         -webkit-overflow-scrolling: auto !important;
                         touch-action: none !important;
                     }
 
-                    /* 내용 강제 이동(값 유지) */
                     .db-force-content-pos {
                         position: absolute !important;
                         top: ${'$'}{CONTENT_START_TOP}px !important;
@@ -129,7 +159,6 @@ internal object MyPlaceAddFix {
                         display: block !important;
                     }
 
-                    /* 납치된 버튼 스타일 */
                     .${'$'}{MOVED_BTN_CLASS} {
                         position: fixed !important;
                         bottom: ${'$'}{NEXT_BTN_BOTTOM}px !important;
@@ -198,19 +227,22 @@ internal object MyPlaceAddFix {
             function manageLayout() {
                 var active = isAddPlace();
 
+                // ✅ AddPlace가 아니면 무조건 스크롤락/스타일 해제 + 스크롤 원복
+                if (!active) {
+                  removeScrollLock();
+                  removeStyles();
+                  forceRestoreScroll();
+                }
+
                 if (active) {
                     applyStyles();
-
-                    // ✅ 스크롤 기능 제거 (레이아웃값은 건드리지 않음)
                     installScrollLock();
 
-                    // 1) 내용 이동(값 유지)
                     var content = findContentWrapper();
                     if (content && !content.classList.contains('db-force-content-pos')) {
                         content.classList.add('db-force-content-pos');
                     }
 
-                    // 2) 버튼 납치 및 이동
                     var btn = findNextBtn();
                     if (btn) {
                         if (!btn.classList.contains(MOVED_BTN_CLASS)) {
@@ -219,17 +251,13 @@ internal object MyPlaceAddFix {
                         }
                     }
 
-                    // 3) 뒤로가기 버튼 조정
                     var backBtn = findBackBtn();
                     if (backBtn) {
                         backBtn.style.setProperty('transform', 'translateY(' + BACK_BTN_DOWN + 'px)', 'important');
                         backBtn.style.setProperty('z-index', '2147483647', 'important');
                     }
-
                 } else {
-                    removeStyles();
-                    removeScrollLock();
-
+                    // --- 청소 모드 ---
                     var ghostBtns = document.querySelectorAll('.' + MOVED_BTN_CLASS);
                     for (var i=0; i<ghostBtns.length; i++) {
                         ghostBtns[i].parentNode.removeChild(ghostBtns[i]);
