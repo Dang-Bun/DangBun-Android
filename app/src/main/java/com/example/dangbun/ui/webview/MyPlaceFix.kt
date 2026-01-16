@@ -7,9 +7,17 @@ internal object MyPlaceFix {
         val js = """
             (function() {
               try {
-                var GRAY_BG = '#F5F6F8'; 
+                var GRAY_BG = '#F5F6F8';
                 var styleId = '__db_final_ordered_layout_fix_v3__';
-
+                
+                // ✅ 여기 값만 바꾸면서 튜닝하세요
+                var HEADER_TOP_EXTRA = 0;   // 기존 42였던 "추가 여백"
+                // 너무 늘리면 "내 플레이스" 텍스트가 아래로 밀려서 안보임
+                var HEADER_SPACER_H = 0;     // 필요시 0~16 정도 (보조 여백)
+                
+                // ✅ 리스트-버튼 사이 하단 여백(이 값만 튜닝)
+                var LIST_BOTTOM_GAP = 840;
+                
                 // ✅ style 태그 upsert
                 var style = document.getElementById(styleId);
                 if (!style) {
@@ -33,9 +41,11 @@ internal object MyPlaceFix {
                     background-color: ${'$'}{GRAY_BG} !important;
                     width: 100% !important;
                     min-height: 56px !important;
-                    padding-top: calc(env(safe-area-inset-top) + 12px) !important;
+
+                    padding-top: calc(env(safe-area-inset-top)) !important;
                     padding-bottom: 12px !important;
-                    position: relative !important; 
+
+                    position: relative !important;
                     display: flex !important;
                     justify-content: center !important;
                     align-items: center !important;
@@ -63,12 +73,12 @@ internal object MyPlaceFix {
 
                   /* 3. 청소 알림 버블 */
                   #db-bubble-fix {
-                    margin: 15px auto 10px auto !important; 
+                    margin: 15px auto 10px auto !important;
                     display: table !important;
                     background-color: transparent !important;
                   }
 
-                  /* ✅ 4. FAB 래퍼(가운데 고정) - 핵심: body로 옮기지 않고도 중앙 고정 */
+                  /* 4. FAB 래퍼(가운데 고정) */
                   .db-add-btn-wrap {
                     position: fixed !important;
                     left: 50% !important;
@@ -105,11 +115,15 @@ internal object MyPlaceFix {
 
                 function apply() {
                   var path = location.pathname || '';
-                  var isMyPlace = (path.indexOf('MyPlace') >= 0 || path.indexOf('myplace') >= 0 || (document.body && document.body.innerText || '').indexOf('내 플레이스') >= 0);
+                  var bodyText = (document.body && document.body.innerText) ? document.body.innerText : '';
+                  var isMyPlace = (
+                    path.indexOf('MyPlace') >= 0 ||
+                    path.indexOf('myplace') >= 0 ||
+                    bodyText.indexOf('내 플레이스') >= 0
+                  );
                   if (!isMyPlace) return;
 
                   // ✅ "리스트 화면"에서만 FAB를 고정하고, 상세 화면에서는 숨김 처리
-                  // (텍스트 기반 휴리스틱: 리스트에만 반복적으로 보이는 요소들)
                   function isListView() {
                     try {
                       var text = (document.body && document.body.innerText) ? document.body.innerText : '';
@@ -117,14 +131,13 @@ internal object MyPlaceFix {
                       if (text.indexOf('새로운 알림') >= 0) score++;
                       if (text.indexOf('완료된 청소') >= 0) score++;
                       if (text.indexOf('매니저') >= 0) score++;
-                      // 리스트 특징이 2개 이상이면 리스트로 간주
                       return score >= 2;
                     } catch(e) { return true; }
                   }
 
                   var inList = isListView();
 
-                  // 배경색 강제 적용 (화면 덮는 흰색 박스 제거)
+                  // ✅ 배경색 강제 적용 (화면 덮는 흰색 박스 제거)
                   try {
                     document.documentElement.style.setProperty('background-color', GRAY_BG, 'important');
                     document.body.style.setProperty('background-color', GRAY_BG, 'important');
@@ -138,8 +151,8 @@ internal object MyPlaceFix {
                         if (rect.width > window.innerWidth * 0.92 && rect.height > window.innerHeight * 0.60) {
                           var st = window.getComputedStyle(el);
                           if (st.backgroundColor === 'rgb(255, 255, 255)') {
-                             el.style.setProperty('background', GRAY_BG, 'important');
-                             el.style.setProperty('background-color', GRAY_BG, 'important');
+                            el.style.setProperty('background', GRAY_BG, 'important');
+                            el.style.setProperty('background-color', GRAY_BG, 'important');
                           }
                         }
                       }
@@ -160,7 +173,39 @@ internal object MyPlaceFix {
                         }
 
                         if (header) {
-                          header.classList.add('db-header-wrapper');
+                          try {
+                            header.style.setProperty('background-color', GRAY_BG, 'important');
+                            header.style.setProperty('background', GRAY_BG, 'important');
+
+                            header.style.setProperty(
+                              'padding-top',
+                              'calc(env(safe-area-inset-top) + ' + HEADER_TOP_EXTRA + 'px)',
+                              'important'
+                            );
+
+                            header.style.setProperty('padding-bottom', '12px', 'important');
+                            header.style.setProperty('box-sizing', 'border-box', 'important');
+
+                            header.style.setProperty('position', 'relative', 'important');
+                            var spacerId = '__db_header_top_spacer__';
+                            var spacer = header.querySelector('#' + spacerId);
+                            if (!spacer) {
+                              spacer = document.createElement('div');
+                              spacer.id = spacerId;
+                              spacer.style.position = 'absolute';
+                              spacer.style.left = '0';
+                              spacer.style.right = '0';
+                              spacer.style.top = '0';
+                              spacer.style.height = HEADER_SPACER_H + 'px';
+                              spacer.style.background = GRAY_BG;
+                              spacer.style.pointerEvents = 'none';
+                              header.appendChild(spacer);
+                            } else {
+                              spacer.style.height = HEADER_SPACER_H + 'px';
+                              spacer.style.background = GRAY_BG;
+                            }
+                          } catch(e) {}
+
                           var menu = header.querySelector('svg, button, [class*="menu"]');
                           if (menu && menu !== tags[i]) {
                             menu.classList.add('db-menu-icon');
@@ -178,7 +223,7 @@ internal object MyPlaceFix {
                     for (var j=0; j<divs.length; j++) {
                       if ((divs[j].innerText || '').indexOf('오늘 남은 청소는') >= 0) {
                         var bubble = divs[j];
-                        for(var d=0; d<3 && bubble.parentElement; d++) {
+                        for (var d=0; d<3 && bubble.parentElement; d++) {
                           if (getComputedStyle(bubble).borderRadius !== '0px') break;
                           bubble = bubble.parentElement;
                         }
@@ -189,17 +234,42 @@ internal object MyPlaceFix {
                     }
                   } catch(e) {}
 
+                  // ✅ 리스트-버튼 겹침 방지: "진짜 스크롤 호스트(host)" 끝에 spacer를 붙인다
+                  function ensureBottomSpacerOnHost(host) {
+                    try {
+                      if (!host) return;
+
+                      var spacerId = '__db_list_bottom_spacer__';
+                      var spacer = document.getElementById(spacerId);
+
+                      if (!spacer) {
+                        spacer = document.createElement('div');
+                        spacer.id = spacerId;
+                        spacer.style.width = '1px';
+                        spacer.style.pointerEvents = 'none';
+                        spacer.style.background = 'transparent';
+                      }
+
+                      var spacerH = LIST_BOTTOM_GAP;
+                      spacer.style.height = 'calc(' + spacerH + 'px + env(safe-area-inset-bottom))';
+
+                      if (spacer.parentNode !== host) {
+                        try { spacer.parentNode && spacer.parentNode.removeChild(spacer); } catch(e) {}
+                        host.appendChild(spacer);
+                      }
+                    } catch(e) {}
+                  }
+
                   // C. 플레이스 추가 버튼 처리
                   var btns = document.querySelectorAll('button');
                   for (var k = 0; k < btns.length; k++) {
                     var btn = btns[k];
                     if (((btn.innerText || '')).indexOf('플레이스 추가') >= 0) {
 
-                      // 0) 상세 화면이면: FAB 고정 해제 + 숨김 (버튼이 DOM에 남아있어도 안 보이게)
+                      // 0) 상세 화면이면: FAB 고정 해제 + 숨김
                       if (!inList) {
                         try {
                           var wrap0 = btn.parentElement || btn;
-                          // 래퍼가 이미 db-add-btn-wrap로 고정돼 있으면 풀어주고 숨김
                           wrap0.classList.remove('db-add-btn-wrap');
                           wrap0.style.removeProperty('position');
                           wrap0.style.removeProperty('left');
@@ -214,41 +284,62 @@ internal object MyPlaceFix {
                         break;
                       }
 
-                      // 1) 스크롤 호스트 찾아 padding-bottom 확보(겹침 방지)
                       function findScrollHost(seed) {
-                        var docEl = document.scrollingElement || document.documentElement;
-                        if (docEl && docEl.scrollHeight > docEl.clientHeight + 10) return docEl;
+                        try {
+                          var cur = seed;
+                          for (var step = 0; step < 12 && cur; step++) {
+                            var p = cur.parentElement;
+                            if (!p) break;
+                            var st = window.getComputedStyle(p);
+                            var oy = st ? st.overflowY : '';
+                            var ch = p.clientHeight || 0;
+                            var sh = p.scrollHeight || 0;
+                            if ((oy === 'auto' || oy === 'scroll') && sh > ch + 10 && ch >= window.innerHeight * 0.4) {
+                              return p;
+                            }
+                            cur = p;
+                          }
+                        } catch(e) {}
 
                         var best = null;
                         var bestScore = 0;
-                        var nodes = document.querySelectorAll('body *');
-                        for (var i = 0; i < nodes.length; i++) {
-                          var el = nodes[i];
-                          if (!el || !el.getBoundingClientRect) continue;
+                        try {
+                          var nodes = document.querySelectorAll('body *');
+                          for (var i = 0; i < nodes.length; i++) {
+                            var el = nodes[i];
+                            if (!el || !el.getBoundingClientRect) continue;
 
-                          var st = window.getComputedStyle(el);
-                          var oy = st ? st.overflowY : '';
-                          if (oy !== 'auto' && oy !== 'scroll') continue;
+                            var st2 = window.getComputedStyle(el);
+                            var oy2 = st2 ? st2.overflowY : '';
+                            if (oy2 !== 'auto' && oy2 !== 'scroll') continue;
 
-                          var ch = el.clientHeight || 0;
-                          var sh = el.scrollHeight || 0;
-                          if (sh <= ch + 10) continue;
-                          if (ch < window.innerHeight * 0.5) continue;
+                            var ch2 = el.clientHeight || 0;
+                            var sh2 = el.scrollHeight || 0;
+                            if (sh2 <= ch2 + 10) continue;
+                            if (ch2 < window.innerHeight * 0.4) continue;
 
-                          var score = (sh - ch) * ch;
-                          if (score > bestScore) {
-                            bestScore = score;
-                            best = el;
+                            var rect = el.getBoundingClientRect();
+                            var area = Math.max(0, rect.width) * Math.max(0, rect.height);
+                            var score = (sh2 - ch2) * area;
+
+                            if (score > bestScore) {
+                              bestScore = score;
+                              best = el;
+                            }
                           }
-                        }
+                        } catch(e) {}
+
+                        var docEl = document.scrollingElement || document.documentElement;
+                        if (docEl && docEl.scrollHeight > docEl.clientHeight + 10) return docEl;
+
                         return best || document.querySelector('main') || document.body;
                       }
 
+                      // 1) 스크롤 컨테이너 padding-bottom + spacer(겹침 방지)
                       try {
-                        // ✅ 1) 실제 FAB(랩/버튼) 높이를 기준으로 "딱 필요한 만큼"만 확보
                         var wrapForMeasure = null;
                         try {
-                          wrapForMeasure = (wrap && wrap.getBoundingClientRect) ? wrap : (btn.parentElement || btn);
+                          wrapForMeasure = (btn.parentElement && btn.parentElement.getBoundingClientRect) ? btn.parentElement : btn;
                         } catch(e) { wrapForMeasure = btn; }
 
                         var fabH = 56;
@@ -256,39 +347,27 @@ internal object MyPlaceFix {
                           fabH = Math.ceil((wrapForMeasure.getBoundingClientRect().height || 56));
                         } catch(e) {}
 
-                        // ✅ 버튼 위/아래 여유 (마지막 카드가 완전히 보이도록)
-                        var extra = 32; // 필요하면 48로만 올리면 됨
+                        var extra = LIST_BOTTOM_GAP; // 버튼-리스트 간격
                         var safePx = fabH + extra;
 
-                        // ✅ 2) "진짜 스크롤 컨테이너"를 못 잡는 케이스 대비: 여러 후보에 동시에 적용
                         var host = findScrollHost(btn);
-
-                        var targets = [
-                          host,
-                          document.querySelector('main'),
-                          document.querySelector('#root'),
-                          document.body,
-                          document.scrollingElement,
-                          document.documentElement
-                        ].filter(Boolean);
-
-                        for (var t = 0; t < targets.length; t++) {
-                          var el = targets[t];
-                          el.style.setProperty(
+                        if (host) {
+                          host.style.setProperty(
                             'padding-bottom',
                             'calc(' + safePx + 'px + env(safe-area-inset-bottom))',
                             'important'
                           );
-                          el.style.setProperty('box-sizing', 'border-box', 'important');
-                          // ✅ 스크롤할 때도 하단 여유 반영 (일부 브라우저/레이아웃에서 효과 좋음)
-                          el.style.setProperty(
+                          host.style.setProperty('box-sizing', 'border-box', 'important');
+                          host.style.setProperty(
                             'scroll-padding-bottom',
                             'calc(' + safePx + 'px + env(safe-area-inset-bottom))',
                             'important'
                           );
+
+                          // ✅ 핵심: 같은 host 끝에 spacer를 붙여 스크롤 길이 자체를 늘림
+                          ensureBottomSpacerOnHost(host);
                         }
                       } catch(e) {}
-
 
                       // 2) 래퍼 잡기
                       var wrap = btn.parentElement;
@@ -301,9 +380,6 @@ internal object MyPlaceFix {
                         }
                       } catch(e) {}
                       if (!wrap) wrap = btn;
-
-                      // ✅ 핵심: body로 옮기지 않는다 (클릭 이벤트/라우팅 유지)
-                      // document.body.appendChild(...) 제거
 
                       // 3) FAB 고정(중앙)
                       try {
@@ -322,7 +398,7 @@ internal object MyPlaceFix {
                         wrap.style.setProperty('background', 'transparent', 'important');
                       } catch(e) {}
 
-                      // 4) (선택) 버블 아래로 위치 이동 — root 내부 이동이므로 클릭 유지
+                      // 4) (선택) 버블 아래로 위치 이동
                       try {
                         if (bubbleEl && bubbleEl.parentNode && wrap && bubbleEl.parentNode.nodeType !== 9) {
                           bubbleEl.parentNode.insertBefore(wrap, bubbleEl.nextSibling);
