@@ -15,12 +15,13 @@ internal object MyPlaceAddFix {
             // ==========================================
             // [설정 값 유지]
             // ==========================================
+            var GRAY_BG = '#F5F6F8';
             var CONTENT_START_TOP = -110;   // ✅ 절대 변경하지 않음
             var NEXT_BTN_BOTTOM = 60;
             var BACK_BTN_DOWN = 20;
 
             var STYLE_ID = '__db_addplace_css_hack_final__';
-            var MOVED_BTN_CLASS = 'db-next-btn-moved-to-body'; // 납치한 버튼 식별용
+            var MOVED_BTN_CLASS = 'db-next-btn-moved-to-body'; // 납치한 버튼 식별용(이름은 유지)
 
             // ✅ 스크롤락 설치 여부
             var __dbScrollLockInstalled = false;
@@ -131,6 +132,7 @@ internal object MyPlaceAddFix {
                 style.id = STYLE_ID;
                 style.textContent = `
                     html, body, #root, #__next, main {
+                        background-color: ${'$'}{'$'}{GRAY_BG} !important;
                         display: block !important;
                         height: auto !important;
                         min-height: 100% !important;
@@ -221,6 +223,15 @@ internal object MyPlaceAddFix {
                 return best;
             }
 
+            // ✅ React/Next root 안으로만 붙이기 (이벤트 유지 목적)
+            function pickReactRootHost() {
+              try {
+                return document.querySelector('#__next')
+                  || document.querySelector('#root')
+                  || document.querySelector('main');
+              } catch(e) { return null; }
+            }
+
             // ==========================================
             // [3] 메인 로직
             // ==========================================
@@ -247,7 +258,11 @@ internal object MyPlaceAddFix {
                     if (btn) {
                         if (!btn.classList.contains(MOVED_BTN_CLASS)) {
                             btn.classList.add(MOVED_BTN_CLASS);
-                            document.body.appendChild(btn);
+
+                            // ✅ body로 보내면 클릭이 죽을 수 있어 React root 안으로만 이동
+                            var host = pickReactRootHost();
+                            if (host) host.appendChild(btn);
+                            else document.body.appendChild(btn); // (최후 fallback)
                         }
                     }
 

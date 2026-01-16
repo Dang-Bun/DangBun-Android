@@ -32,3 +32,4 @@ internal fun injectKakaoLtrFix(view: WebView) {
 internal fun injectAddPlaceMemberSelectInsetFix(view: WebView) {
     AddPlaceMemberSelectFix.injectAddPlaceMemberSelectInsetFix(view)
 }
+
