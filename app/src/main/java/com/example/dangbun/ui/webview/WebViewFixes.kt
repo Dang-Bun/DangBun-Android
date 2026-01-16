@@ -5,7 +5,13 @@ import com.example.dangbun.ui.webview.fixes.addplace.AddPlaceMemberSelectFix
 import com.example.dangbun.ui.webview.fixes.common.CommonModalFix
 import com.example.dangbun.ui.webview.fixes.kakao.KakaoFix
 import com.example.dangbun.ui.webview.fixes.myplace.MyPlaceFix
+import com.example.dangbun.ui.webview.fixes.onboarding.OnboardingTopInsetFix
 import com.example.dangbun.ui.webview.fixes.splash.SplashFix
+
+// ✅ 온보딩(상단 여백 내려오기) 픽스
+internal fun injectOnboardingTopInsetFix(view: WebView, topPx: Int = 24) {
+    OnboardingTopInsetFix.inject(view, topPx)
+}
 
 internal fun injectMyPlaceUnifiedFix(view: WebView) {
     MyPlaceFix.inject(view)
