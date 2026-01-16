@@ -102,6 +102,11 @@ fun DangbunWebViewScreen(
                     // ✅ 멤버 선택 화면 픽스
                     injectAddPlaceMemberSelectInsetFix(view)
 
+                    // ✅ placemake1: 뒤로가기 아래 여백 줄이기
+
+                    injectPlaceMake1TopInsetFix(view, raisePx = 120) // 56부터 시작 (72/84로 올리면 더 당겨짐)
+
+
                     // ✅ SPA 네비게이션 감지 후 (콘솔 로그용)
                     view.evaluateJavascript(
                         """
