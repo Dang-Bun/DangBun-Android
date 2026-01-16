@@ -22,7 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake1TopInsetFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake2TopInsetFix
+import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake3TopInsetFix
 
 private const val TAG = "DANGBUN_WV"
 
@@ -104,10 +106,11 @@ fun DangbunWebViewScreen(
                     injectAddPlaceMemberSelectInsetFix(view)
 
                     // ✅ placemake1: 뒤로가기 아래 여백 줄이기
-                    injectPlaceMake1TopInsetFix(view, raisePx = 120) // 56부터 시작 (72/84로 올리면 더 당겨짐)
+                    PlaceMake1TopInsetFix.inject(view, raisePx = 120) // 56부터 시작 (72/84로 올리면 더 당겨짐)
                     // ✅ placemake2: 앱에서 가운데로 내려가는 현상 → 위로 당겨서 웹처럼 보이게
                     PlaceMake2TopInsetFix.inject(view, raisePx = 140)
-
+                    // ✅ placemake3: 완료 화면이 위로 떠있어서 아래로 내려 가운데에 오도록
+                    PlaceMake3TopInsetFix.inject(view, downPx = 120)
                     // ✅ SPA 네비게이션 감지 후 (콘솔 로그용)
                     view.evaluateJavascript(
                         """

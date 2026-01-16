@@ -2,7 +2,6 @@ package com.example.dangbun.ui.webview
 
 import android.webkit.WebView
 import com.example.dangbun.ui.webview.fixes.addplace.AddPlaceMemberSelectFix
-import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake1TopInsetFix
 import com.example.dangbun.ui.webview.fixes.common.CommonModalFix
 import com.example.dangbun.ui.webview.fixes.kakao.KakaoFix
 import com.example.dangbun.ui.webview.fixes.myplace.MyPlaceFix
@@ -34,6 +33,3 @@ internal fun injectAddPlaceMemberSelectInsetFix(view: WebView) {
     AddPlaceMemberSelectFix.injectAddPlaceMemberSelectInsetFix(view)
 }
 
-internal fun injectPlaceMake1TopInsetFix(view: WebView, raisePx: Int = 56) {
-    PlaceMake1TopInsetFix.inject(view, raisePx = raisePx)
-}
