@@ -15,7 +15,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            DangbunWebViewScreen(onClose = { finish() })
+            DangbunWebViewScreen(
+                url = "https://dangbun-frontend-virid.vercel.app/onboarding",
+                onClose = { finish() },
+                applyStatusBarPadding = true
+            )
         }
     }
 }

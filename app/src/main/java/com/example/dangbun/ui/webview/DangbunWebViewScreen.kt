@@ -14,10 +14,13 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 
 private const val TAG = "DANGBUN_WV"
@@ -33,6 +36,7 @@ private const val TARGET_SCALE = 0.8f
 fun DangbunWebViewScreen(
     url: String = "https://dangbun-frontend-virid.vercel.app/",
     onClose: () -> Unit,
+    applyStatusBarPadding: Boolean = false,
 ) {
     val context = LocalContext.current
 
@@ -82,6 +86,10 @@ fun DangbunWebViewScreen(
                     super.onPageFinished(view, url)
                     view.post { view.scrollTo(0, 0) }
 
+                    // ✅ 온보딩: 위로 붙는 현상 완화 (상단 여백)
+                    if (applyStatusBarPadding) {
+                        injectOnboardingTopInsetFix(view, topPx = 24)
+                    }
                     // ✅ 공통 픽스 (모달 등)
                     injectCommonFixes(view)
                     // ✅ 스플래시 픽스
@@ -123,10 +131,21 @@ fun DangbunWebViewScreen(
         if (webView.canGoBack()) webView.goBack() else onClose()
     }
 
+    val webViewModifier =
+        if (applyStatusBarPadding) {
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(top = 20.dp)
+        } else {
+            Modifier.fillMaxSize()
+        }
+
     AndroidView(
-        modifier = Modifier.fillMaxSize(),
+        modifier = webViewModifier,
         factory = { webView }
     )
+
 }
 
 private fun handleUrl(
