@@ -39,6 +39,10 @@ private const val TAG = "DANGBUN_WV"
 // ✅ 스플래시 배경(첨부 이미지 근사)
 const val SPLASH_BG_HEX = "#6A84F4"
 
+// ✅ 공통 색
+private const val GRAY_BG_HEX = "#F5F6F8"
+private const val WHITE_BG_HEX = "#FFFFFF"
+
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun DangbunWebViewScreen(
@@ -70,14 +74,13 @@ fun DangbunWebViewScreen(
     }
 
     /**
-     * ✅ addPlace/placemake에서 상단 흰띠를 "무조건" 회색으로 덮는 주입
-     * - try/catch 사용 안 함 (문법 에러 방지)
-     * - 백틱(template literal) 사용 안 함 (문법 에러 방지)
+     * ✅ (기존) 회색 상단띠/배경 강제 주입
+     * - myplace / placemake 에서만 사용
      */
     fun injectGrayTopBandKiller(view: WebView) {
         val js = """
             (function () {
-              var GRAY_BG = '#F5F6F8';
+              var GRAY_BG = '${GRAY_BG_HEX}';
               var styleId = '__db_gray_topband_killer__';
               var style = document.getElementById(styleId);
               if (!style) {
@@ -90,27 +93,66 @@ fun DangbunWebViewScreen(
                 'html, body { background:' + GRAY_BG + ' !important; }' +
                 'body { margin:0 !important; padding:0 !important; }' +
                 '#root, #__next, main { background:' + GRAY_BG + ' !important; min-height:100vh !important; }' +
-
-                /* ✅ 상단 흰띠는 대부분 "헤더/상단 래퍼"가 흰 배경을 들고 있음 */
                 'header, nav, [role="banner"] { background:' + GRAY_BG + ' !important; }' +
                 '[class*="Header"], [class*="header"], [class*="AppBar"], [class*="appbar"], [class*="Top"], [class*="top"] { background:' + GRAY_BG + ' !important; }' +
-
-                /* ✅ safe-area / inset padding 영역이 흰색으로 깔리는 경우 */
                 '[style*="safe-area-inset-top"], [style*="env(safe-area-inset-top)"] { background:' + GRAY_BG + ' !important; }' +
-
-                /* ✅ 최상단 여백/패딩만 흰색인 경우가 많아서 상단쪽 배경을 넓게 회색 처리 */
                 'body:before {' +
                   'content:""; position:fixed; left:0; top:0; right:0; height:220px;' +
                   'background:' + GRAY_BG + '; z-index:-1;' +
                 '}' +
-
-                /* ✅ 혹시 웹이 상단에 흰색 오버레이를 별도 div로 두는 경우 대비 */
                 '[class*="SafeArea"], [class*="safearea"], [class*="Inset"], [class*="inset"] { background:' + GRAY_BG + ' !important; }'
               ;
 
-              // 인라인 스타일로도 한 번 더
               document.documentElement.style.backgroundColor = GRAY_BG;
               if (document.body) document.body.style.backgroundColor = GRAY_BG;
+            })();
+        """.trimIndent()
+
+        view.evaluateJavascript(js, null)
+    }
+
+    /**
+     * ✅ (추가) addPlace 진입 시:
+     * 1) 이전에 깔린 회색 강제 style(__db_gray_topband_killer__) 제거
+     * 2) 흰색 배경 강제 적용
+     *
+     * SPA라서 head에 남아있는 style 때문에 "회색이 계속 끼는" 현상을 끊는 용도
+     */
+    fun injectAddPlaceWhiteBackground(view: WebView) {
+        val js = """
+            (function () {
+              // 1) 이전 회색 강제 스타일 제거
+              var grayStyle = document.getElementById('__db_gray_topband_killer__');
+              if (grayStyle && grayStyle.parentNode) {
+                grayStyle.parentNode.removeChild(grayStyle);
+              }
+
+              // 2) 흰색 강제 스타일 적용(덮어쓰기)
+              var WHITE_BG = '${WHITE_BG_HEX}';
+              var styleId = '__db_addplace_white_bg__';
+              var style = document.getElementById(styleId);
+              if (!style) {
+                style = document.createElement('style');
+                style.id = styleId;
+                document.head.appendChild(style);
+              }
+
+              style.textContent =
+                'html, body { background:' + WHITE_BG + ' !important; }' +
+                'body { margin:0 !important; padding:0 !important; }' +
+                '#root, #__next, main { background:' + WHITE_BG + ' !important; min-height:100vh !important; }' +
+                'header, nav, [role="banner"] { background:' + WHITE_BG + ' !important; }' +
+                '[class*="Header"], [class*="header"], [class*="AppBar"], [class*="appbar"], [class*="Top"], [class*="top"] { background:' + WHITE_BG + ' !important; }' +
+                '[class*="SafeArea"], [class*="safearea"], [class*="Inset"], [class*="inset"] { background:' + WHITE_BG + ' !important; }' +
+                'body:before { content:none !important; }'
+              ;
+
+              // 3) 인라인도 흰색으로 고정
+              document.documentElement.style.backgroundColor = WHITE_BG;
+              if (document.body) document.body.style.backgroundColor = WHITE_BG;
+
+              // 디버그 로그(원하면 나중에 삭제 가능)
+              console.log('[DB_ADDPLACE_WHITE_BG] applied');
             })();
         """.trimIndent()
 
@@ -121,16 +163,20 @@ fun DangbunWebViewScreen(
     fun applyRouteFix(pathRaw: String, view: WebView) {
         val path = pathRaw.lowercase()
 
+        // ✅ addPlace는 "웹처럼 흰색"이 목표 => 컨테이너도 흰색으로
         containerBg =
             when {
                 path.contains("myplace") -> Color(0xFFF5F6F8)
-                path.contains("addplace") -> Color(0xFFF5F6F8)
                 path.contains("placemake") -> Color(0xFFF5F6F8)
+                path.contains("addplace") -> Color.White
                 else -> Color.White
             }
 
-        // ✅ 회색 화면군은 "무조건" 상단 흰띠 제거 주입
-        if (path.contains("addplace") || path.contains("placemake") || path.contains("myplace")) {
+        // ✅ 핵심: SPA에서 남아있는 회색 style을 addPlace에서 제거 + 흰색 강제
+        if (path.contains("addplace")) {
+            injectAddPlaceWhiteBackground(view)
+        } else if (path.contains("placemake") || path.contains("myplace")) {
+            // ✅ 회색 화면군은 여기서만 회색 강제 주입
             injectGrayTopBandKiller(view)
         }
 
@@ -139,8 +185,7 @@ fun DangbunWebViewScreen(
             injectMyPlaceUnifiedFix(view)
         }
 
-        // ✅ addPlace 라우터 픽스
-        // ⚠️ 기존 injectAddPlaceMemberSelectInsetFix(view) 는 현재 /addPlace에서 JS SyntaxError를 유발할 가능성이 높아서 일단 호출하지 않습니다.
+        // ✅ addPlace 라우터 픽스(현재 비활성 유지)
         // if (path.contains("addplace")) { injectAddPlaceMemberSelectInsetFix(view) }
 
         // ✅ placemake 라우터 픽스
@@ -156,16 +201,15 @@ fun DangbunWebViewScreen(
         }
 
         if (path.contains("placejoin1")) {
-            PlaceJoin1LayoutFix.inject(view, raisePx = 170,liftBottomPx = 24)
+            PlaceJoin1LayoutFix.inject(view, raisePx = 170, liftBottomPx = 24)
         }
-
     }
 
     val webView = remember {
         WebView(context).apply {
             Log.d(TAG, "WebView init, startUrl=$url")
 
-            // ✅ WebView 자체 배경 투명 + 오버스크롤 제거(상단 흰 여백 느낌 줄이기)
+            // ✅ WebView 자체 배경 투명 + 오버스크롤 제거
             setBackgroundColor(AColor.TRANSPARENT)
             background = null
             overScrollMode = WebView.OVER_SCROLL_NEVER
@@ -232,7 +276,7 @@ fun DangbunWebViewScreen(
                         (function() {
                           if (window.__dangbun_spa_hook__) return;
                           window.__dangbun_spa_hook__ = true;
-                          var notify = function() { 
+                          var notify = function() {
                             console.log('SPA_NAV_DETECTED', location.pathname);
                           };
                           var _ps = history.pushState;
