@@ -15,6 +15,10 @@ internal object PlaceMake2TopInsetFix {
             var STYLE_ID = '__db_placemake2_top_inset_fix__';
             var CLASS_NAME = 'db-placemake2-content-raise';
 
+            // ✅ 완료 버튼을 "조금만" 위로 올리는 값
+            var COMPLETE_RAISE_PX = 24;
+            var COMPLETE_APPLIED_ATTR = 'data-db-complete-raised';
+
             function isPlaceMake2() {
               try {
                 var path = (location.pathname || '').toLowerCase();
@@ -98,6 +102,75 @@ internal object PlaceMake2TopInsetFix {
               }
             }
 
+            function getText(el) {
+              try {
+                return (el.innerText || el.value || '').replace(/\s/g,'');
+              } catch(e) { return ''; }
+            }
+
+            function findCompleteButton() {
+              try {
+                var candidates = document.querySelectorAll(
+                  'button, a, [role="button"], input[type="button"], input[type="submit"]'
+                );
+                for (var i = 0; i < candidates.length; i++) {
+                  var txt = getText(candidates[i]);
+                  if (txt === '완료' || txt.indexOf('완료') >= 0) {
+                    return candidates[i];
+                  }
+                }
+                return null;
+              } catch(e) {
+                return null;
+              }
+            }
+
+            function findFixedParent(el) {
+              try {
+                var cur = el;
+                for (var i = 0; i < 10; i++) {
+                  if (!cur || !cur.parentElement) break;
+                  cur = cur.parentElement;
+
+                  var cs = window.getComputedStyle(cur);
+                  var pos = cs ? cs.position : '';
+                  if (pos === 'fixed' || pos === 'sticky') {
+                    // bottom이 0 근처인 footer 후보
+                    return cur;
+                  }
+                }
+                return null;
+              } catch(e) {
+                return null;
+              }
+            }
+
+            function raiseCompleteArea() {
+              try {
+                var btn = findCompleteButton();
+                if (!btn) return;
+
+                // 이미 적용했으면 스킵
+                if (btn.getAttribute(COMPLETE_APPLIED_ATTR) === '1') return;
+
+                // 1) 버튼 자체를 살짝 위로
+                btn.style.transform = 'translateY(-' + COMPLETE_RAISE_PX + 'px)';
+                btn.style.willChange = 'transform';
+                btn.setAttribute(COMPLETE_APPLIED_ATTR, '1');
+
+                // 2) fixed 부모가 있으면 부모도 같이 올려서 "바닥에 딱 붙는 느낌" 완화
+                var fixedParent = findFixedParent(btn);
+                if (fixedParent && fixedParent.getAttribute(COMPLETE_APPLIED_ATTR) !== '1') {
+                  // bottom 값을 올리거나, transform으로 올림(둘 중 하나만)
+                  fixedParent.style.transform = 'translateY(-' + COMPLETE_RAISE_PX + 'px)';
+                  fixedParent.style.willChange = 'transform';
+                  fixedParent.setAttribute(COMPLETE_APPLIED_ATTR, '1');
+                }
+
+                console.log('PLACEMAKE2_COMPLETE_RAISED', 'px=' + COMPLETE_RAISE_PX);
+              } catch(e) {}
+            }
+
             function apply() {
               var active = isPlaceMake2();
 
@@ -114,6 +187,9 @@ internal object PlaceMake2TopInsetFix {
                 w.classList.add(CLASS_NAME);
                 console.log('PLACEMAKE2_FIX_APPLIED', 'raisePx=' + ${raisePx});
               }
+
+              // ✅ 완료 버튼/하단영역도 같이 올리기
+              raiseCompleteArea();
             }
 
             apply();

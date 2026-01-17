@@ -17,6 +17,10 @@ internal object PlaceMake3TopInsetFix {
             var CLASS_NAME = 'db-placemake3-content-down';
             var HTML_ATTR = 'data-db-placemake3';
 
+            // ✅ 하단 "플레이스 이동" 버튼을 살짝 위로 올릴 값
+            var MOVE_BTN_RAISE_PX = 24;
+            var MOVE_APPLIED_ATTR = 'data-db-movebtn-raised';
+
             function isPlaceMake3() {
               try {
                 var path = (location.pathname || '').toLowerCase();
@@ -85,6 +89,78 @@ internal object PlaceMake3TopInsetFix {
               }
             }
 
+            function getText(el) {
+              try {
+                return (el.innerText || el.value || '').replace(/\s/g,'');
+              } catch(e) { return ''; }
+            }
+
+            function findMoveButton() {
+              try {
+                // ✅ 텍스트 후보: "플레이스 이동", "이동", "완료", "다음"
+                var keywords = ['플레이스이동', '이동', '완료', '다음'];
+
+                var candidates = document.querySelectorAll(
+                  'button, a, [role="button"], input[type="button"], input[type="submit"]'
+                );
+
+                for (var i = 0; i < candidates.length; i++) {
+                  var txt = getText(candidates[i]);
+                  if (!txt) continue;
+
+                  for (var k = 0; k < keywords.length; k++) {
+                    if (txt.indexOf(keywords[k]) >= 0) return candidates[i];
+                  }
+                }
+                return null;
+              } catch(e) {
+                return null;
+              }
+            }
+
+            function findFixedParent(el) {
+              try {
+                var cur = el;
+                for (var i = 0; i < 10; i++) {
+                  if (!cur || !cur.parentElement) break;
+                  cur = cur.parentElement;
+
+                  var cs = window.getComputedStyle(cur);
+                  var pos = cs ? cs.position : '';
+                  if (pos === 'fixed' || pos === 'sticky') {
+                    return cur;
+                  }
+                }
+                return null;
+              } catch(e) {
+                return null;
+              }
+            }
+
+            function raiseMoveButton() {
+              try {
+                var btn = findMoveButton();
+                if (!btn) return;
+
+                if (btn.getAttribute(MOVE_APPLIED_ATTR) === '1') return;
+
+                // 1) 버튼 자체를 위로 올림
+                btn.style.transform = 'translateY(-' + MOVE_BTN_RAISE_PX + 'px)';
+                btn.style.willChange = 'transform';
+                btn.setAttribute(MOVE_APPLIED_ATTR, '1');
+
+                // 2) fixed 부모가 있으면 부모도 같이 올림
+                var fixedParent = findFixedParent(btn);
+                if (fixedParent && fixedParent.getAttribute(MOVE_APPLIED_ATTR) !== '1') {
+                  fixedParent.style.transform = 'translateY(-' + MOVE_BTN_RAISE_PX + 'px)';
+                  fixedParent.style.willChange = 'transform';
+                  fixedParent.setAttribute(MOVE_APPLIED_ATTR, '1');
+                }
+
+                console.log('PLACEMAKE3_MOVE_BTN_RAISED', 'px=' + MOVE_BTN_RAISE_PX);
+              } catch(e) {}
+            }
+
             function manage() {
               var active = isPlaceMake3();
 
@@ -103,6 +179,9 @@ internal object PlaceMake3TopInsetFix {
                 w.classList.add(CLASS_NAME);
                 console.log('PLACEMAKE3_FIX_APPLIED', 'downPx=' + ${downPx});
               }
+
+              // ✅ 하단 버튼도 살짝 위로
+              raiseMoveButton();
             }
 
             manage();
