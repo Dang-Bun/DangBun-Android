@@ -90,10 +90,7 @@ fun DangbunWebViewScreen(
                     super.onPageFinished(view, url)
                     view.post { view.scrollTo(0, 0) }
 
-                    // ✅ 온보딩: 위로 붙는 현상 완화 (상단 여백)
-                    if (applyStatusBarPadding) {
-                        injectOnboardingTopInsetFix(view, topPx = 24)
-                    }
+
                     // ✅ 공통 픽스 (모달 등)
                     injectCommonFixes(view)
                     // ✅ 스플래시 픽스
@@ -114,6 +111,11 @@ fun DangbunWebViewScreen(
                     PlaceMake3TopInsetFix.inject(view, downPx = 120)
                     // ✅ placemake3: 참여코드 생성 팝업의 "공유하기" 버튼 클릭 -> 네이티브 공유 실행
                     PlaceMake3ShareFix.inject(view)
+                    // ✅ 온보딩: 위로 붙는 현상 완화 (상단 여백)
+                    if (applyStatusBarPadding) {
+                        injectOnboardingTopInsetFix(view, topPx = 24)
+                    }
+
                     // ✅ SPA 네비게이션 감지 후 (콘솔 로그용)
                     view.evaluateJavascript(
                         """
