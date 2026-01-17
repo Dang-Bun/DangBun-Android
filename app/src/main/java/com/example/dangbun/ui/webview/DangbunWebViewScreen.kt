@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowInsetsControllerCompat
+import com.example.dangbun.ui.webview.fixes.addplace.PlaceJoin1TopRaiseFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake1TopInsetFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake2TopInsetFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake3ShareFix
@@ -153,6 +154,11 @@ fun DangbunWebViewScreen(
             PlaceMake3TopInsetFix.inject(view, downPx = 120)
             PlaceMake3ShareFix.inject(view)
         }
+
+        if (path.contains("placejoin1")) {
+            PlaceJoin1TopRaiseFix.inject(view, raisePx = 170)
+        }
+
     }
 
     val webView = remember {
