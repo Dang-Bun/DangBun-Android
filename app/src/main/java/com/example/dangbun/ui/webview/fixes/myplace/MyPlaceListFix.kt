@@ -10,7 +10,7 @@ internal object MyPlaceListFix {
                 var styleId = '__db_myplace_list_fix_padding_v3__';
 
                 // ✅ [핵심 튜닝] 여기 숫자를 늘려서 간격을 확보합니다.
-                var FAB_SAFE_RAISE = 24;    // 버튼을 바닥에서 얼마나 띄울지
+                var FAB_SAFE_RAISE = 45;    // 버튼을 바닥에서 얼마나 띄울지
                 var LIST_BOTTOM_GAP = 100;  // 마지막 아이템과 버튼 사이의 간격 (기존보다 대폭 확대)
                 
                 // ---------------------------
