@@ -1,9 +1,7 @@
 package com.example.dangbun.ui.webview
 
 import android.annotation.SuppressLint
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
+import android.app.Activity
 import android.net.Uri
 import android.util.Log
 import android.webkit.ConsoleMessage
@@ -14,31 +12,31 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowInsetsControllerCompat
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake1TopInsetFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake2TopInsetFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake3ShareFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake3TopInsetFix
+import android.graphics.Color as AColor
 
 private const val TAG = "DANGBUN_WV"
 
 // ✅ 스플래시 배경(첨부 이미지 근사)
 const val SPLASH_BG_HEX = "#6A84F4"
-
-// ✅ 목표 배율(0.8)
-private const val TARGET_SCALE = 0.8f
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -48,14 +46,123 @@ fun DangbunWebViewScreen(
     applyStatusBarPadding: Boolean = false,
 ) {
     val context = LocalContext.current
+    val activity = context as? Activity
 
-    // ✅ 라우터별로 "상단 여백(Compose 컨테이너)" 배경을 바꿔줄 상태
+    // ✅ 라우터별 컨테이너 배경
     var containerBg by remember { mutableStateOf(Color.White) }
+
+    // ✅ status bar도 containerBg 색과 동일하게
+    DisposableEffect(containerBg, activity) {
+        val window = activity?.window
+        val prevColor = window?.statusBarColor
+
+        if (window != null) {
+            window.statusBarColor = containerBg.toArgb()
+            WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = true
+        }
+
+        onDispose {
+            if (window != null && prevColor != null) {
+                window.statusBarColor = prevColor
+            }
+        }
+    }
+
+    /**
+     * ✅ addPlace/placemake에서 상단 흰띠를 "무조건" 회색으로 덮는 주입
+     * - try/catch 사용 안 함 (문법 에러 방지)
+     * - 백틱(template literal) 사용 안 함 (문법 에러 방지)
+     */
+    fun injectGrayTopBandKiller(view: WebView) {
+        val js = """
+            (function () {
+              var GRAY_BG = '#F5F6F8';
+              var styleId = '__db_gray_topband_killer__';
+              var style = document.getElementById(styleId);
+              if (!style) {
+                style = document.createElement('style');
+                style.id = styleId;
+                document.head.appendChild(style);
+              }
+
+              style.textContent =
+                'html, body { background:' + GRAY_BG + ' !important; }' +
+                'body { margin:0 !important; padding:0 !important; }' +
+                '#root, #__next, main { background:' + GRAY_BG + ' !important; min-height:100vh !important; }' +
+
+                /* ✅ 상단 흰띠는 대부분 "헤더/상단 래퍼"가 흰 배경을 들고 있음 */
+                'header, nav, [role="banner"] { background:' + GRAY_BG + ' !important; }' +
+                '[class*="Header"], [class*="header"], [class*="AppBar"], [class*="appbar"], [class*="Top"], [class*="top"] { background:' + GRAY_BG + ' !important; }' +
+
+                /* ✅ safe-area / inset padding 영역이 흰색으로 깔리는 경우 */
+                '[style*="safe-area-inset-top"], [style*="env(safe-area-inset-top)"] { background:' + GRAY_BG + ' !important; }' +
+
+                /* ✅ 최상단 여백/패딩만 흰색인 경우가 많아서 상단쪽 배경을 넓게 회색 처리 */
+                'body:before {' +
+                  'content:""; position:fixed; left:0; top:0; right:0; height:220px;' +
+                  'background:' + GRAY_BG + '; z-index:-1;' +
+                '}' +
+
+                /* ✅ 혹시 웹이 상단에 흰색 오버레이를 별도 div로 두는 경우 대비 */
+                '[class*="SafeArea"], [class*="safearea"], [class*="Inset"], [class*="inset"] { background:' + GRAY_BG + ' !important; }'
+              ;
+
+              // 인라인 스타일로도 한 번 더
+              document.documentElement.style.backgroundColor = GRAY_BG;
+              if (document.body) document.body.style.backgroundColor = GRAY_BG;
+            })();
+        """.trimIndent()
+
+        view.evaluateJavascript(js, null)
+    }
+
+    // ✅ 라우터 적용 (페이지 로드 + SPA 이동 모두 동일 처리)
+    fun applyRouteFix(pathRaw: String, view: WebView) {
+        val path = pathRaw.lowercase()
+
+        containerBg =
+            when {
+                path.contains("myplace") -> Color(0xFFF5F6F8)
+                path.contains("addplace") -> Color(0xFFF5F6F8)
+                path.contains("placemake") -> Color(0xFFF5F6F8)
+                else -> Color.White
+            }
+
+        // ✅ 회색 화면군은 "무조건" 상단 흰띠 제거 주입
+        if (path.contains("addplace") || path.contains("placemake") || path.contains("myplace")) {
+            injectGrayTopBandKiller(view)
+        }
+
+        // ✅ MyPlace 라우터 픽스
+        if (path.contains("myplace")) {
+            injectMyPlaceUnifiedFix(view)
+        }
+
+        // ✅ addPlace 라우터 픽스
+        // ⚠️ 기존 injectAddPlaceMemberSelectInsetFix(view) 는 현재 /addPlace에서 JS SyntaxError를 유발할 가능성이 높아서 일단 호출하지 않습니다.
+        // if (path.contains("addplace")) { injectAddPlaceMemberSelectInsetFix(view) }
+
+        // ✅ placemake 라우터 픽스
+        if (path.contains("placemake1")) {
+            PlaceMake1TopInsetFix.inject(view, raisePx = 120)
+        }
+        if (path.contains("placemake2")) {
+            PlaceMake2TopInsetFix.inject(view, raisePx = 140)
+        }
+        if (path.contains("placemake3")) {
+            PlaceMake3TopInsetFix.inject(view, downPx = 120)
+            PlaceMake3ShareFix.inject(view)
+        }
+    }
 
     val webView = remember {
         WebView(context).apply {
             Log.d(TAG, "WebView init, startUrl=$url")
-            setBackgroundColor(android.graphics.Color.WHITE)
+
+            // ✅ WebView 자체 배경 투명 + 오버스크롤 제거(상단 흰 여백 느낌 줄이기)
+            setBackgroundColor(AColor.TRANSPARENT)
+            background = null
+            overScrollMode = WebView.OVER_SCROLL_NEVER
 
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
@@ -72,16 +179,21 @@ fun DangbunWebViewScreen(
             settings.userAgentString = "$defaultUa Mobile"
 
             webChromeClient = object : WebChromeClient() {
-                override fun onProgressChanged(view: WebView, newProgress: Int) {
-                    super.onProgressChanged(view, newProgress)
-                }
-
                 override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                    val msg = consoleMessage.message() ?: ""
                     Log.e(
                         TAG,
-                        "WV_CONSOLE(${consoleMessage.messageLevel()}): ${consoleMessage.message()} " +
+                        "WV_CONSOLE(${consoleMessage.messageLevel()}): $msg " +
                             "(${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})"
                     )
+
+                    // ✅ SPA 이동도 즉시 처리
+                    if (msg.startsWith("SPA_NAV_DETECTED")) {
+                        val detectedPath = msg.removePrefix("SPA_NAV_DETECTED").trim()
+                        this@apply.post {
+                            applyRouteFix(detectedPath, this@apply)
+                        }
+                    }
                     return super.onConsoleMessage(consoleMessage)
                 }
             }
@@ -98,76 +210,38 @@ fun DangbunWebViewScreen(
                     super.onPageFinished(view, url)
                     view.post { view.scrollTo(0, 0) }
 
-                    // ✅ 라우터(path) 추출
-                    val path = runCatching { Uri.parse(url).path.orEmpty().lowercase() }.getOrDefault("")
+                    val path = runCatching { Uri.parse(url).path.orEmpty() }.getOrDefault("")
 
-                    // ✅ (핵심) 라우터별로 "상단 여백" 배경색 변경
-                    containerBg =
-                        when {
-                            path.contains("myplace") -> Color(0xFFF5F6F8)     // ✅ 내플레이스: 회색
-                            path.contains("addplace") -> Color(0xFFF5F6F8)    // (원하면 같이 회색)
-                            path.contains("placemake") -> Color(0xFFF5F6F8)   // (원하면 같이 회색)
-                            path.contains("onboarding") -> Color.White        // ✅ 온보딩: 흰색
-                            else -> Color.White
-                        }
-
-                    // ✅ (항상) 공통 픽스들 - 정말 공통만 남기기
+                    // ✅ 공통 픽스
                     injectCommonFixes(view)
                     injectSplashFix(view)
                     if (url.contains("kakao.com")) injectKakaoLtrFix(view)
 
-                    // ✅ 온보딩 라우터에서만: 상단 여백/배경
-                    if (path.contains("onboarding")) {
-                        if (applyStatusBarPadding) {
-                            injectOnboardingTopInsetFix(view, topPx = -45)
-                        }
-                    }
+                    // ✅ 페이지 로드에서도 동일 적용
+                    applyRouteFix(path, view)
 
-                    // ✅ MyPlace 라우터에서만: MyPlace 통합 픽스
-                    if (path.contains("myplace")) {
-                        injectMyPlaceUnifiedFix(view)
-                    }
-
-                    // ✅ addPlace 라우터에서만
-                    if (path.contains("addplace")) {
-                        injectAddPlaceMemberSelectInsetFix(view)
-                    }
-
-                    // ✅ placemake 라우터에서만
-                    if (path.contains("placemake1")) {
-                        PlaceMake1TopInsetFix.inject(view, raisePx = 120)
-                    }
-                    if (path.contains("placemake2")) {
-                        PlaceMake2TopInsetFix.inject(view, raisePx = 140)
-                    }
-                    if (path.contains("placemake3")) {
-                        PlaceMake3TopInsetFix.inject(view, downPx = 120)
-                        PlaceMake3ShareFix.inject(view)
-                    }
-
-                    // ✅ SPA 네비게이션 감지 (이건 유지)
+                    // ✅ SPA 네비게이션 감지 설치(유지)
                     view.evaluateJavascript(
                         """
-        (function() {
-          if (window.__dangbun_spa_hook__) return;
-          window.__dangbun_spa_hook__ = true;
-          var notify = function() { 
-            console.log('SPA_NAV_DETECTED', location.pathname);
-          };
-          var _ps = history.pushState;
-          history.pushState = function() { _ps.apply(this, arguments); notify(); };
-          var _rs = history.replaceState;
-          history.replaceState = function() { _rs.apply(this, arguments); notify(); };
-          window.addEventListener('popstate', notify);
-        })();
-        """.trimIndent(),
+                        (function() {
+                          if (window.__dangbun_spa_hook__) return;
+                          window.__dangbun_spa_hook__ = true;
+                          var notify = function() { 
+                            console.log('SPA_NAV_DETECTED', location.pathname);
+                          };
+                          var _ps = history.pushState;
+                          history.pushState = function() { _ps.apply(this, arguments); notify(); };
+                          var _rs = history.replaceState;
+                          history.replaceState = function() { _rs.apply(this, arguments); notify(); };
+                          window.addEventListener('popstate', notify);
+                        })();
+                        """.trimIndent(),
                         null
                     )
                 }
             }
 
             addJavascriptInterface(DangbunJsBridge(context), "DangbunBridge")
-
             loadUrl(url)
         }
     }
@@ -176,23 +250,21 @@ fun DangbunWebViewScreen(
         if (webView.canGoBack()) webView.goBack() else onClose()
     }
 
-    val webViewModifier =
-        if (applyStatusBarPadding) {
-            Modifier
-                .fillMaxSize()
-                .background(containerBg)   // ✅ 상태바 아래 여백 포함해서 이 색으로 칠해짐
-                .statusBarsPadding()
-                .padding(top = 20.dp)
-        } else {
-            Modifier
-                .fillMaxSize()
-                .background(containerBg)
-        }
-
-    AndroidView(
-        modifier = webViewModifier,
-        factory = { webView }
-    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(containerBg)
+    ) {
+        AndroidView(
+            modifier =
+                if (applyStatusBarPadding) {
+                    Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                } else {
+                    Modifier.fillMaxSize()
+                },
+            factory = { webView }
+        )
+    }
 }
-
-
