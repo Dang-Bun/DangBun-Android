@@ -9,7 +9,7 @@ import android.webkit.WebView
 
 private const val TAG = "DANGBUN_WV"
 
-private fun handleUrl(
+internal fun handleUrl(
     context: Context,
     url: String,
     webView: WebView,

@@ -1,9 +1,7 @@
 package com.example.dangbun.ui.webview
 
 import android.annotation.SuppressLint
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
+import android.app.Activity
 import android.net.Uri
 import android.util.Log
 import android.webkit.ConsoleMessage
@@ -13,26 +11,37 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowInsetsControllerCompat
+import com.example.dangbun.ui.webview.fixes.addplace.PlaceJoin1LayoutFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake1TopInsetFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake2TopInsetFix
+import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake3ShareFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake3TopInsetFix
+import android.graphics.Color as AColor
 
 private const val TAG = "DANGBUN_WV"
 
 // ✅ 스플래시 배경(첨부 이미지 근사)
 const val SPLASH_BG_HEX = "#6A84F4"
 
-// ✅ 목표 배율(0.8)
-private const val TARGET_SCALE = 0.8f
+// ✅ 공통 색
+private const val GRAY_BG_HEX = "#F5F6F8"
+private const val WHITE_BG_HEX = "#FFFFFF"
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -42,11 +51,168 @@ fun DangbunWebViewScreen(
     applyStatusBarPadding: Boolean = false,
 ) {
     val context = LocalContext.current
+    val activity = context as? Activity
+
+    // ✅ 라우터별 컨테이너 배경
+    var containerBg by remember { mutableStateOf(Color.White) }
+
+    // ✅ status bar도 containerBg 색과 동일하게
+    DisposableEffect(containerBg, activity) {
+        val window = activity?.window
+        val prevColor = window?.statusBarColor
+
+        if (window != null) {
+            window.statusBarColor = containerBg.toArgb()
+            WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = true
+        }
+
+        onDispose {
+            if (window != null && prevColor != null) {
+                window.statusBarColor = prevColor
+            }
+        }
+    }
+
+    /**
+     * ✅ (기존) 회색 상단띠/배경 강제 주입
+     * - myplace / placemake 에서만 사용
+     */
+    fun injectGrayTopBandKiller(view: WebView) {
+        val js = """
+            (function () {
+              var GRAY_BG = '${GRAY_BG_HEX}';
+              var styleId = '__db_gray_topband_killer__';
+              var style = document.getElementById(styleId);
+              if (!style) {
+                style = document.createElement('style');
+                style.id = styleId;
+                document.head.appendChild(style);
+              }
+
+              style.textContent =
+                'html, body { background:' + GRAY_BG + ' !important; }' +
+                'body { margin:0 !important; padding:0 !important; }' +
+                '#root, #__next, main { background:' + GRAY_BG + ' !important; min-height:100vh !important; }' +
+                'header, nav, [role="banner"] { background:' + GRAY_BG + ' !important; }' +
+                '[class*="Header"], [class*="header"], [class*="AppBar"], [class*="appbar"], [class*="Top"], [class*="top"] { background:' + GRAY_BG + ' !important; }' +
+                '[style*="safe-area-inset-top"], [style*="env(safe-area-inset-top)"] { background:' + GRAY_BG + ' !important; }' +
+                'body:before {' +
+                  'content:""; position:fixed; left:0; top:0; right:0; height:220px;' +
+                  'background:' + GRAY_BG + '; z-index:-1;' +
+                '}' +
+                '[class*="SafeArea"], [class*="safearea"], [class*="Inset"], [class*="inset"] { background:' + GRAY_BG + ' !important; }'
+              ;
+
+              document.documentElement.style.backgroundColor = GRAY_BG;
+              if (document.body) document.body.style.backgroundColor = GRAY_BG;
+            })();
+        """.trimIndent()
+
+        view.evaluateJavascript(js, null)
+    }
+
+    /**
+     * ✅ (추가) addPlace 진입 시:
+     * 1) 이전에 깔린 회색 강제 style(__db_gray_topband_killer__) 제거
+     * 2) 흰색 배경 강제 적용
+     *
+     * SPA라서 head에 남아있는 style 때문에 "회색이 계속 끼는" 현상을 끊는 용도
+     */
+    fun injectAddPlaceWhiteBackground(view: WebView) {
+        val js = """
+            (function () {
+              // 1) 이전 회색 강제 스타일 제거
+              var grayStyle = document.getElementById('__db_gray_topband_killer__');
+              if (grayStyle && grayStyle.parentNode) {
+                grayStyle.parentNode.removeChild(grayStyle);
+              }
+
+              // 2) 흰색 강제 스타일 적용(덮어쓰기)
+              var WHITE_BG = '${WHITE_BG_HEX}';
+              var styleId = '__db_addplace_white_bg__';
+              var style = document.getElementById(styleId);
+              if (!style) {
+                style = document.createElement('style');
+                style.id = styleId;
+                document.head.appendChild(style);
+              }
+
+              style.textContent =
+                'html, body { background:' + WHITE_BG + ' !important; }' +
+                'body { margin:0 !important; padding:0 !important; }' +
+                '#root, #__next, main { background:' + WHITE_BG + ' !important; min-height:100vh !important; }' +
+                'header, nav, [role="banner"] { background:' + WHITE_BG + ' !important; }' +
+                '[class*="Header"], [class*="header"], [class*="AppBar"], [class*="appbar"], [class*="Top"], [class*="top"] { background:' + WHITE_BG + ' !important; }' +
+                '[class*="SafeArea"], [class*="safearea"], [class*="Inset"], [class*="inset"] { background:' + WHITE_BG + ' !important; }' +
+                'body:before { content:none !important; }'
+              ;
+
+              // 3) 인라인도 흰색으로 고정
+              document.documentElement.style.backgroundColor = WHITE_BG;
+              if (document.body) document.body.style.backgroundColor = WHITE_BG;
+
+              // 디버그 로그(원하면 나중에 삭제 가능)
+              console.log('[DB_ADDPLACE_WHITE_BG] applied');
+            })();
+        """.trimIndent()
+
+        view.evaluateJavascript(js, null)
+    }
+
+    // ✅ 라우터 적용 (페이지 로드 + SPA 이동 모두 동일 처리)
+    fun applyRouteFix(pathRaw: String, view: WebView) {
+        val path = pathRaw.lowercase()
+
+        // ✅ addPlace는 "웹처럼 흰색"이 목표 => 컨테이너도 흰색으로
+        containerBg =
+            when {
+                path.contains("myplace") -> Color(0xFFF5F6F8)
+                path.contains("placemake") -> Color(0xFFF5F6F8)
+                path.contains("addplace") -> Color.White
+                else -> Color.White
+            }
+
+        // ✅ 핵심: SPA에서 남아있는 회색 style을 addPlace에서 제거 + 흰색 강제
+        if (path.contains("addplace")) {
+            injectAddPlaceWhiteBackground(view)
+        } else if (path.contains("placemake") || path.contains("myplace")) {
+            // ✅ 회색 화면군은 여기서만 회색 강제 주입
+            injectGrayTopBandKiller(view)
+        }
+
+        // ✅ MyPlace 라우터 픽스
+        if (path.contains("myplace")) {
+            injectMyPlaceUnifiedFix(view)
+        }
+
+        // ✅ addPlace 라우터 픽스(현재 비활성 유지)
+        // if (path.contains("addplace")) { injectAddPlaceMemberSelectInsetFix(view) }
+
+        // ✅ placemake 라우터 픽스
+        if (path.contains("placemake1")) {
+            PlaceMake1TopInsetFix.inject(view, raisePx = 120)
+        }
+        if (path.contains("placemake2")) {
+            PlaceMake2TopInsetFix.inject(view, raisePx = 140)
+        }
+        if (path.contains("placemake3")) {
+            PlaceMake3TopInsetFix.inject(view, downPx = 120)
+            PlaceMake3ShareFix.inject(view)
+        }
+
+        if (path.contains("placejoin1")) {
+            PlaceJoin1LayoutFix.inject(view, raisePx = 170, liftBottomPx = 24)
+        }
+    }
 
     val webView = remember {
         WebView(context).apply {
             Log.d(TAG, "WebView init, startUrl=$url")
-            setBackgroundColor(android.graphics.Color.WHITE)
+
+            // ✅ WebView 자체 배경 투명 + 오버스크롤 제거
+            setBackgroundColor(AColor.TRANSPARENT)
+            background = null
+            overScrollMode = WebView.OVER_SCROLL_NEVER
 
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
@@ -63,16 +229,21 @@ fun DangbunWebViewScreen(
             settings.userAgentString = "$defaultUa Mobile"
 
             webChromeClient = object : WebChromeClient() {
-                override fun onProgressChanged(view: WebView, newProgress: Int) {
-                    super.onProgressChanged(view, newProgress)
-                }
-
                 override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                    val msg = consoleMessage.message() ?: ""
                     Log.e(
                         TAG,
-                        "WV_CONSOLE(${consoleMessage.messageLevel()}): ${consoleMessage.message()} " +
+                        "WV_CONSOLE(${consoleMessage.messageLevel()}): $msg " +
                             "(${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})"
                     )
+
+                    // ✅ SPA 이동도 즉시 처리
+                    if (msg.startsWith("SPA_NAV_DETECTED")) {
+                        val detectedPath = msg.removePrefix("SPA_NAV_DETECTED").trim()
+                        this@apply.post {
+                            applyRouteFix(detectedPath, this@apply)
+                        }
+                    }
                     return super.onConsoleMessage(consoleMessage)
                 }
             }
@@ -89,35 +260,23 @@ fun DangbunWebViewScreen(
                     super.onPageFinished(view, url)
                     view.post { view.scrollTo(0, 0) }
 
-                    // ✅ 온보딩: 위로 붙는 현상 완화 (상단 여백)
-                    if (applyStatusBarPadding) {
-                        injectOnboardingTopInsetFix(view, topPx = 24)
-                    }
-                    // ✅ 공통 픽스 (모달 등)
+                    val path = runCatching { Uri.parse(url).path.orEmpty() }.getOrDefault("")
+
+                    // ✅ 공통 픽스
                     injectCommonFixes(view)
-                    // ✅ 스플래시 픽스
                     injectSplashFix(view)
-                    // ✅ 카카오 방향 픽스
                     if (url.contains("kakao.com")) injectKakaoLtrFix(view)
 
-                    // ✅ 내 플레이스 통합 픽스 (상단/하단 간격 유지)
-                    injectMyPlaceUnifiedFix(view)
-                    // ✅ 멤버 선택 화면 픽스
-                    injectAddPlaceMemberSelectInsetFix(view)
+                    // ✅ 페이지 로드에서도 동일 적용
+                    applyRouteFix(path, view)
 
-                    // ✅ placemake1: 뒤로가기 아래 여백 줄이기
-                    PlaceMake1TopInsetFix.inject(view, raisePx = 120) // 56부터 시작 (72/84로 올리면 더 당겨짐)
-                    // ✅ placemake2: 앱에서 가운데로 내려가는 현상 → 위로 당겨서 웹처럼 보이게
-                    PlaceMake2TopInsetFix.inject(view, raisePx = 140)
-                    // ✅ placemake3: 완료 화면이 위로 떠있어서 아래로 내려 가운데에 오도록
-                    PlaceMake3TopInsetFix.inject(view, downPx = 120)
-                    // ✅ SPA 네비게이션 감지 후 (콘솔 로그용)
+                    // ✅ SPA 네비게이션 감지 설치(유지)
                     view.evaluateJavascript(
                         """
                         (function() {
                           if (window.__dangbun_spa_hook__) return;
                           window.__dangbun_spa_hook__ = true;
-                          var notify = function() { 
+                          var notify = function() {
                             console.log('SPA_NAV_DETECTED', location.pathname);
                           };
                           var _ps = history.pushState;
@@ -132,6 +291,7 @@ fun DangbunWebViewScreen(
                 }
             }
 
+            addJavascriptInterface(DangbunJsBridge(context), "DangbunBridge")
             loadUrl(url)
         }
     }
@@ -140,68 +300,21 @@ fun DangbunWebViewScreen(
         if (webView.canGoBack()) webView.goBack() else onClose()
     }
 
-    val webViewModifier =
-        if (applyStatusBarPadding) {
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(top = 20.dp)
-        } else {
-            Modifier.fillMaxSize()
-        }
-
-    AndroidView(
-        modifier = webViewModifier,
-        factory = { webView }
-    )
-
-}
-
-private fun handleUrl(
-    context: Context,
-    url: String,
-    webView: WebView,
-): Boolean {
-    Log.d(TAG, "handleUrl(url=$url)")
-
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-        Log.d(TAG, "handleUrl -> http/https, let WebView load")
-        return false
-    }
-
-    if (url.startsWith("intent:", ignoreCase = true)) {
-        return try {
-            val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
-            context.startActivity(intent)
-            Log.d(TAG, "handleUrl -> intent startActivity OK")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "handleUrl -> intent failed: ${e.message}")
-
-            try {
-                val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
-                val fallbackUrl = intent.getStringExtra("browser_fallback_url")
-                if (!fallbackUrl.isNullOrBlank()) {
-                    Log.d(TAG, "handleUrl -> fallbackUrl=$fallbackUrl")
-                    webView.loadUrl(fallbackUrl)
-                    true
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(containerBg)
+    ) {
+        AndroidView(
+            modifier =
+                if (applyStatusBarPadding) {
+                    Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
                 } else {
-                    false
-                }
-            } catch (e2: Exception) {
-                Log.e(TAG, "handleUrl -> fallback parse failed: ${e2.message}")
-                false
-            }
-        }
-    }
-
-    return try {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        context.startActivity(intent)
-        Log.d(TAG, "handleUrl -> external scheme startActivity OK")
-        true
-    } catch (e: ActivityNotFoundException) {
-        Log.e(TAG, "handleUrl -> no activity for scheme: $url")
-        true
+                    Modifier.fillMaxSize()
+                },
+            factory = { webView }
+        )
     }
 }

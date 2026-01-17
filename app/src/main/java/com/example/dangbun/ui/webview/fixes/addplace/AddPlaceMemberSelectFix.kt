@@ -1,8 +1,8 @@
-// “매니저/멤버 선택 화면”처럼 ‘다음’ 버튼이 있는 화면
 package com.example.dangbun.ui.webview.fixes.addplace
 
 import android.webkit.WebView
 
+// “매니저/멤버 선택 화면”처럼 ‘다음’ 버튼이 있는 화면
 internal object AddPlaceMemberSelectFix {
     internal fun injectAddPlaceMemberSelectInsetFix(view: WebView) {
         val js =
@@ -74,84 +74,119 @@ internal object AddPlaceMemberSelectFix {
                 wrap = wrap.parentElement;
               }
 
-  if (!wrap) return;
+              if (!wrap) return;
 
-  // ✅ 이미 적용했으면 종료
-  if (wrap.__dangbun_select_bottom__) return;
-  wrap.__dangbun_select_bottom__ = true;
+              // ✅ 이미 적용했으면 종료
+              if (wrap.__dangbun_select_bottom__) return;
+              wrap.__dangbun_select_bottom__ = true;
 
-  // ✅ 1) 포탈 컨테이너(body 직속) 생성: transform 영향 완전 차단
-  var portal = document.getElementById('__dangbun_bottom_portal__');
-  if (!portal) {
-    portal = document.createElement('div');
-    portal.id = '__dangbun_bottom_portal__';
-    document.body.appendChild(portal);
-  }
+              // ✅ 1) 포탈 컨테이너(body 직속) 생성: transform 영향 완전 차단
+              var portal = document.getElementById('__dangbun_bottom_portal__');
+              if (!portal) {
+                portal = document.createElement('div');
+                portal.id = '__dangbun_bottom_portal__';
+                document.body.appendChild(portal);
+              }
 
-  // ✅ 2) 원래 위치에 placeholder를 만들어 레이아웃 붕괴 방지
-  var placeholder = document.createElement('div');
-  placeholder.id = '__dangbun_bottom_placeholder__';
+              // ✅ 2) 원래 위치에 placeholder를 만들어 레이아웃 붕괴 방지
+              var placeholder = document.createElement('div');
+              placeholder.id = '__dangbun_bottom_placeholder__';
 
-  // wrap의 원래 높이만큼 확보(없으면 기본값)
-  var h = wrap.getBoundingClientRect().height || 72;
-  placeholder.style.height = Math.ceil(h) + 'px';
+              // wrap의 원래 높이만큼 확보(없으면 기본값)
+              var h = wrap.getBoundingClientRect().height || 72;
+              placeholder.style.height = Math.ceil(h) + 'px';
 
-  // wrap이 원래 있던 자리에 placeholder 삽입
-  if (wrap.parentNode) {
-    wrap.parentNode.insertBefore(placeholder, wrap);
-  }
+              // wrap이 원래 있던 자리에 placeholder 삽입
+              if (wrap.parentNode) {
+                wrap.parentNode.insertBefore(placeholder, wrap);
+              }
 
-  // ✅ 3) wrap을 body 직속 portal로 "이사"
-  portal.appendChild(wrap);
+              // ✅ 3) wrap을 body 직속 portal로 "이사"
+              portal.appendChild(wrap);
 
-  // ✅ 4) portal 자체를 화면 하단에 고정 + 가운데 정렬
-  portal.style.position = 'fixed';
-  portal.style.left = '0';
-  portal.style.right = '0';
-// ✅ 현재 스케일(0.8 등) 보정해서 실제로는 더 띄우기
-var scale = (window.visualViewport && window.visualViewport.scale) ? window.visualViewport.scale : 1;
+              // ✅ 4) portal 자체를 화면 하단에 고정 + 가운데 정렬
+              portal.style.position = 'fixed';
+              portal.style.left = '0';
+              portal.style.right = '0';
 
-// "기기 기준"으로 72px 정도 띄우고 싶으면 CSS px는 72/scale로 줘야 함
-var desiredDevicePx = 72;
-portal.style.bottom = (desiredDevicePx / scale) + 'px';
-  portal.style.zIndex = '999999';
-  portal.style.pointerEvents = 'none'; // portal은 클릭 막고, 안의 wrap만 클릭 허용
+              // ✅ 현재 스케일(0.8 등) 보정해서 실제로는 더 띄우기
+              var scale = (window.visualViewport && window.visualViewport.scale) ? window.visualViewport.scale : 1;
 
-  portal.style.display = 'flex';
-  portal.style.justifyContent = 'center';
+              // "기기 기준"으로 72px 정도 띄우고 싶으면 CSS px는 72/scale로 줘야 함
+              var desiredDevicePx = 72;
+              portal.style.bottom = (desiredDevicePx / scale) + 'px';
 
-  // ✅ 5) wrap은 portal 안에서 “정상 플로우”로 두고 폭만 지정(중앙 정렬은 portal이 담당)
-  wrap.style.position = 'relative';
-  wrap.style.left = 'auto';
-  wrap.style.right = 'auto';
-  wrap.style.bottom = 'auto';
-  wrap.style.transform = 'none';
+              portal.style.zIndex = '999999';
+              portal.style.pointerEvents = 'none'; // portal은 클릭 막고, 안의 wrap만 클릭 허용
 
-  wrap.style.width = 'calc(100vw - 32px)';
-  wrap.style.maxWidth = '520px';
-  wrap.style.margin = '0';
-  wrap.style.padding = '0';
-  wrap.style.pointerEvents = 'auto'; // wrap은 클릭 가능
+              portal.style.display = 'flex';
+              portal.style.justifyContent = 'center';
 
-  // ✅ 6) 본문이 버튼에 가려지지 않도록 바닥 여백 확보
-  var root2 =
-    document.querySelector('#root') ||
-    document.querySelector('#__next') ||
-    document.querySelector('#app') ||
-    document.body;
+              // ✅ 5) wrap은 portal 안에서 “정상 플로우”로 두고 폭만 지정(중앙 정렬은 portal이 담당)
+              wrap.style.position = 'relative';
+              wrap.style.left = 'auto';
+              wrap.style.right = 'auto';
+              wrap.style.bottom = 'auto';
+              wrap.style.transform = 'none';
 
-  var addPad = Math.ceil(h + 32);
-  var curPb = parseFloat((getComputedStyle(root2).paddingBottom || '0').replace('px','')) || 0;
-  if (addPad > curPb) {
-    root2.style.paddingBottom = addPad + 'px';
-    root2.style.boxSizing = 'border-box';
-  }
-}
+              wrap.style.width = 'calc(100vw - 32px)';
+              wrap.style.maxWidth = '520px';
+              wrap.style.margin = '0';
+              wrap.style.padding = '0';
+              wrap.style.pointerEvents = 'auto'; // wrap은 클릭 가능
 
+              // ✅ 6) 본문이 버튼에 가려지지 않도록 바닥 여백 확보
+              var root2 =
+                document.querySelector('#root') ||
+                document.querySelector('#__next') ||
+                document.querySelector('#app') ||
+                document.body;
+
+              var addPad = Math.ceil(h + 32);
+              var curPb = parseFloat((getComputedStyle(root2).paddingBottom || '0').replace('px','')) || 0;
+              if (addPad > curPb) {
+                root2.style.paddingBottom = addPad + 'px';
+                root2.style.boxSizing = 'border-box';
+              }
+            }
+
+            // ✅ 추가: "회색 배경을 가진 실제 래퍼"를 찾아 inline important로 흰색 강제
+            function forceWhiteBackgroundByInline() {
+              try {
+                // 기준점: '다음' 버튼이 있으면 그쪽, 없으면 body
+                var base = hasNextButton() || document.body;
+                if (!base) return;
+
+                // base에서 위로 올라가면서 "실제로 배경색을 가진" 래퍼를 찾음
+                var target = null;
+                var el = base;
+                for (var i = 0; i < 12 && el; i++) {
+                  var bg = '';
+                  try { bg = window.getComputedStyle(el).backgroundColor; } catch(e) {}
+                  if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+                    target = el;
+                    break;
+                  }
+                  el = el.parentElement;
+                }
+                if (!target) target = document.body;
+
+                // ✅ inline + important 로 흰색 강제 (CSS보다 우선)
+                var nodes = [document.documentElement, document.body, target];
+                for (var k = 0; k < nodes.length; k++) {
+                  var n = nodes[k];
+                  if (!n) continue;
+                  n.style.setProperty('background', '#FFFFFF', 'important');
+                  n.style.setProperty('background-color', '#FFFFFF', 'important');
+                }
+              } catch(e) {}
             }
 
             function apply() {
               if (!isManagerMemberSelectScreen()) return;
+
+              // ✅ 회색 끼임 제거(실제 배경 래퍼를 inline으로 흰색 강제)
+              forceWhiteBackgroundByInline();
 
               // ✅ 화면 전용으로 1회 적용 + 변동 대응
               applyTopInset();
