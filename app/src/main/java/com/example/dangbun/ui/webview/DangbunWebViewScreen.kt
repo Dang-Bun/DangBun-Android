@@ -27,7 +27,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowInsetsControllerCompat
-import com.example.dangbun.ui.webview.fixes.addplace.PlaceJoin1TopRaiseFix
+import com.example.dangbun.ui.webview.fixes.addplace.PlaceJoin1LayoutFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake1TopInsetFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake2TopInsetFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake3ShareFix
@@ -156,7 +156,7 @@ fun DangbunWebViewScreen(
         }
 
         if (path.contains("placejoin1")) {
-            PlaceJoin1TopRaiseFix.inject(view, raisePx = 170)
+            PlaceJoin1LayoutFix.inject(view, raisePx = 170,liftBottomPx = 24)
         }
 
     }
