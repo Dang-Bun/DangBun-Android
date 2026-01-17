@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake1TopInsetFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake2TopInsetFix
+import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake3ShareFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake3TopInsetFix
 
 private const val TAG = "DANGBUN_WV"
@@ -111,6 +112,8 @@ fun DangbunWebViewScreen(
                     PlaceMake2TopInsetFix.inject(view, raisePx = 140)
                     // ✅ placemake3: 완료 화면이 위로 떠있어서 아래로 내려 가운데에 오도록
                     PlaceMake3TopInsetFix.inject(view, downPx = 120)
+                    // ✅ placemake3: 참여코드 생성 팝업의 "공유하기" 버튼 클릭 -> 네이티브 공유 실행
+                    PlaceMake3ShareFix.inject(view)
                     // ✅ SPA 네비게이션 감지 후 (콘솔 로그용)
                     view.evaluateJavascript(
                         """
@@ -131,6 +134,7 @@ fun DangbunWebViewScreen(
                     )
                 }
             }
+            addJavascriptInterface(DangbunJsBridge(context), "DangbunBridge")
 
             loadUrl(url)
         }
@@ -205,3 +209,4 @@ private fun handleUrl(
         true
     }
 }
+
