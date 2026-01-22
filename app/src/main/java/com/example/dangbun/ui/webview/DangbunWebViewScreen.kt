@@ -286,7 +286,7 @@ fun DangbunWebViewScreen(
             PlaceMake2TopInsetFix.inject(view, contentStartTop = 60)
         }
         if (path.contains("placemake3")) {
-            PlaceMake3TopInsetFix.inject(view, downPx = 120)
+            PlaceMake3TopInsetFix.inject(view)
             PlaceMake3ShareFix.inject(view)
         }
 
