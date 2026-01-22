@@ -4,7 +4,6 @@ import android.webkit.WebView
 import com.example.dangbun.ui.webview.fixes.addplace.MyPlaceAddFix
 
 internal object MyPlaceFix {
-
     internal fun inject(view: WebView) {
         val js =
             """

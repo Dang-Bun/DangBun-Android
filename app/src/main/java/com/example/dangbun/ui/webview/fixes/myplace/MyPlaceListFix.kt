@@ -1,7 +1,6 @@
 package com.example.dangbun.ui.webview.fixes.myplace
 
 internal object MyPlaceListFix {
-
     internal fun provideJs(): String {
         return """
             (function() {
@@ -187,6 +186,6 @@ internal object MyPlaceListFix {
 
               } catch(e) {}
             })();
-        """.trimIndent()
+            """.trimIndent()
     }
 }

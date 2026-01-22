@@ -23,11 +23,10 @@ class MainActivity : ComponentActivity() {
             DangbunWebViewScreen(
                 url = "https://dangbun-frontend-virid.vercel.app/onboarding",
                 onClose = { finish() },
-                applyStatusBarPadding = true
+                applyStatusBarPadding = true,
             )
         }
     }
-
 }
 
 @Composable

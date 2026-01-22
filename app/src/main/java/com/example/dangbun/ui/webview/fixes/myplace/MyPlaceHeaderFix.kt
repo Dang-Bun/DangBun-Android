@@ -1,7 +1,6 @@
 package com.example.dangbun.ui.webview.fixes.myplace
 
 internal object MyPlaceHeaderFix {
-
     internal fun provideJs(): String {
         return """
             (function() {
@@ -71,6 +70,6 @@ internal object MyPlaceHeaderFix {
                 };
               } catch(e) {}
             })();
-        """.trimIndent()
+            """.trimIndent()
     }
 }

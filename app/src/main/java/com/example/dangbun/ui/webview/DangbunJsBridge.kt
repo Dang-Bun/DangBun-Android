@@ -1,4 +1,4 @@
-package com.example.dangbun.ui.webview
+﻿package com.example.dangbun.ui.webview
 
 import android.content.Context
 import android.content.Intent
@@ -12,10 +12,11 @@ internal class DangbunJsBridge(
         val shareText = (text ?: "").trim()
         if (shareText.isEmpty()) return
 
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, shareText)
-        }
+        val intent =
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, shareText)
+            }
         val chooser = Intent.createChooser(intent, "공유하기")
         chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(chooser)
