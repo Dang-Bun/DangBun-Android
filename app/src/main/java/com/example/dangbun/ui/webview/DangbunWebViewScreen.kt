@@ -283,7 +283,7 @@ fun DangbunWebViewScreen(
         if (path.contains("placemake2")) {
             // raisePx 대신 contentStartTop을 사용하세요.
             // 140은 상단 여백(px)입니다. 화면에 맞게 조절 가능합니다.
-            PlaceMake2TopInsetFix.inject(view, contentStartTop = 140)
+            PlaceMake2TopInsetFix.inject(view, contentStartTop = 60)
         }
         if (path.contains("placemake3")) {
             PlaceMake3TopInsetFix.inject(view, downPx = 120)
