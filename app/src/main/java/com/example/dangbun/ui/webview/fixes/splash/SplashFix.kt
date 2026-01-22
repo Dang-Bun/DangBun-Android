@@ -102,7 +102,7 @@ internal object SplashFix {
 
                     if (host2) {
                       // ✅ 상단 여백을 최소화 (기존 60px -> 0px)
-                      host2.style.paddingTop = '0px';
+                      host2.style.paddingTop = '15px';
                       host2.style.boxSizing = 'border-box';
                     }
                   } catch(e) {}
