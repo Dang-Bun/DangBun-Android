@@ -410,6 +410,151 @@ internal object MyPlaceAddFix {
                 // ==========================================
                 // [3] 메인 로직
                 // ==========================================
+                // ✅ 다른 화면의 스타일 완전 제거 (독립성 보장)
+                function cleanupOtherScreens() {
+                  try {
+                    // 다른 화면의 스타일 제거
+                    var otherStyleIds = [
+                      '__db_placemake1_top_inset_fix__',
+                      '__db_placemake2_top_inset_fix__',
+                      '__db_placemake3_top_inset_fix__',
+                      '__db_onboarding_top_inset_fix__',
+                      '__db_gray_topband_killer__'
+                    ];
+                    for (var i = 0; i < otherStyleIds.length; i++) {
+                      var styleEl = document.getElementById(otherStyleIds[i]);
+                      if (styleEl && styleEl.parentNode) {
+                        styleEl.parentNode.removeChild(styleEl);
+                      }
+                    }
+                    
+                    // 다른 화면의 클래스 제거
+                    var otherClasses = [
+                      'db-back-button-fixed',
+                      'db-next-button-fixed',
+                      'db-placemake2-content-raise'
+                    ];
+                    for (var j = 0; j < otherClasses.length; j++) {
+                      var elements = document.querySelectorAll('.' + otherClasses[j]);
+                      for (var k = 0; k < elements.length; k++) {
+                        try {
+                          elements[k].classList.remove(otherClasses[j]);
+                        } catch(e) {}
+                      }
+                    }
+                    
+                    // 다른 화면의 음수 margin 제거
+                    var mainElements = document.querySelectorAll('main, #root, #__next');
+                    for (var l = 0; l < mainElements.length; l++) {
+                      var el = mainElements[l];
+                      var computedStyle = window.getComputedStyle(el);
+                      var marginTop = computedStyle.marginTop;
+                      if (!isAddPlace() && marginTop && (marginTop.indexOf('-') >= 0 || parseFloat(marginTop) < -10)) {
+                        el.style.setProperty('margin-top', '0', 'important');
+                      }
+                    }
+                    
+                    // overflow, height 초기화
+                    var bodyElements = document.querySelectorAll('html, body');
+                    for (var m = 0; m < bodyElements.length; m++) {
+                      var elem = bodyElements[m];
+                      elem.style.setProperty('overflow-y', 'auto', 'important');
+                      elem.style.setProperty('overflow-x', 'auto', 'important');
+                      elem.style.setProperty('height', 'auto', 'important');
+                      elem.style.setProperty('max-height', 'none', 'important');
+                      elem.style.setProperty('touch-action', 'auto', 'important');
+                    }
+                  } catch(e) {}
+                }
+                
+                // ✅ 매니저/멤버 원형 아이콘 배경 처리 함수 (전역 스코프로 노출)
+                function removeGrayBackgroundBehindIcons() {
+                    try {
+                        // ✅ 모든 원형 요소를 찾아서 처리
+                        var allElements = document.querySelectorAll('*');
+                        for (var i = 0; i < allElements.length; i++) {
+                            var el = allElements[i];
+                            if (!el || !el.getBoundingClientRect) continue;
+                            
+                            var rect = el.getBoundingClientRect();
+                            if (rect.width <= 0 || rect.height <= 0) continue;
+                            
+                            var style = window.getComputedStyle(el);
+                            var bgColor = style.backgroundColor || '';
+                            var borderRadius = style.borderRadius || '';
+                            var width = rect.width;
+                            var height = rect.height;
+                            
+                            // 원형 요소인지 확인 (더 넓은 범위)
+                            var isCircular = (borderRadius.indexOf('50%') >= 0 || 
+                                             borderRadius.indexOf('999') >= 0 || 
+                                             borderRadius.indexOf('1000') >= 0 ||
+                                             (Math.abs(width - height) < 15 && width > 40 && width < 400));
+                            
+                            if (!isCircular || width < 40 || height < 40) continue;
+                            
+                            // 매니저/멤버 영역인지 확인
+                            var parentText = '';
+                            var current = el;
+                            for (var p = 0; p < 10 && current; p++) {
+                                var text = (current.innerText || current.textContent || '').replace(/\s/g, '');
+                                if (text.indexOf('매니저') >= 0 || text.indexOf('Manager') >= 0) {
+                                    parentText = 'manager';
+                                    break;
+                                }
+                                if (text.indexOf('멤버') >= 0 || text.indexOf('Member') >= 0) {
+                                    parentText = 'member';
+                                    break;
+                                }
+                                current = current.parentElement;
+                            }
+                            
+                            // 선택 상태 확인 (배경색이 이미 파란색/초록색이면 건드리지 않음)
+                            var bgColorLower = bgColor.toLowerCase();
+                            var isBlue = bgColorLower.indexOf('rgb(224') >= 0 || bgColorLower.indexOf('#e0e6ff') >= 0;
+                            var isGreen = bgColorLower.indexOf('rgb(224') >= 0 && bgColorLower.indexOf('245') >= 0 || 
+                                         bgColorLower.indexOf('#e0f5e0') >= 0;
+                            
+                            // 이미 선택된 색상이면 건드리지 않음
+                            if (isBlue || isGreen) continue;
+                            
+                            // 회색 배경 감지
+                            var isGray = (bgColorLower.indexOf('rgb(245') >= 0 || 
+                                         bgColorLower.indexOf('rgb(240') >= 0 || 
+                                         bgColorLower.indexOf('rgb(229') >= 0 ||
+                                         bgColorLower.indexOf('rgb(243') >= 0 ||
+                                         bgColorLower.indexOf('rgb(238') >= 0 ||
+                                         bgColorLower.indexOf('rgb(250') >= 0 ||
+                                         bgColorLower.indexOf('rgb(251') >= 0 ||
+                                         bgColorLower.indexOf('rgb(252') >= 0 ||
+                                         bgColorLower.indexOf('rgb(253') >= 0 ||
+                                         bgColorLower.indexOf('rgb(254') >= 0 ||
+                                         bgColorLower.indexOf('gray') >= 0 ||
+                                         bgColorLower.indexOf('grey') >= 0 ||
+                                         bgColorLower === 'rgb(245, 246, 248)' ||
+                                         bgColorLower === 'rgba(245, 246, 248, 1)' ||
+                                         bgColorLower === 'rgba(245, 246, 248, 0.5)' ||
+                                         bgColorLower === 'rgba(245, 246, 248, 0.8)');
+                            
+                            // 매니저 영역이면 회색 배경 제거, 멤버 영역이면 회색 배경으로 통일 (선택되지 않은 경우)
+                            if (parentText === 'manager' && isGray) {
+                                el.style.setProperty('background-color', 'transparent', 'important');
+                                el.style.setProperty('background', 'transparent', 'important');
+                                el.style.setProperty('background-image', 'none', 'important');
+                            } else if (parentText === 'member' && isGray) {
+                                el.style.setProperty('background-color', '#F5F6F8', 'important');
+                                el.style.setProperty('background', '#F5F6F8', 'important');
+                                el.style.setProperty('background-image', 'none', 'important');
+                            }
+                        }
+                    } catch(e) {
+                        // 에러 무시
+                    }
+                }
+                
+                // ✅ 전역 스코프에 노출 (외부에서 호출 가능하도록)
+                window.removeGrayBackgroundBehindIcons = removeGrayBackgroundBehindIcons;
+                
                 function manageLayout() {
                     var active = isAddPlace();
 
@@ -418,8 +563,12 @@ internal object MyPlaceAddFix {
                       removeScrollLock();
                       removeStyles();
                       forceRestoreScroll();
+                      return;
                     }
 
+                    // ✅ 다른 화면의 스타일 제거
+                    cleanupOtherScreens();
+                    
                     if (active) {
                         applyStyles();
                         installScrollLock();
@@ -517,10 +666,10 @@ internal object MyPlaceAddFix {
                             }
                         }
 
-                        // ✅ 매니저/멤버 원형 아이콘 배경 처리
-                        function removeGrayBackgroundBehindIcons() {
+                        // ✅ 매니저/멤버 선택 상태에 따른 배경색 변경
+                        function applyManagerMemberBackgroundColors() {
                             try {
-                                // ✅ 모든 원형 요소를 찾아서 처리
+                                // 모든 원형 요소 찾기
                                 var allElements = document.querySelectorAll('*');
                                 for (var i = 0; i < allElements.length; i++) {
                                     var el = allElements[i];
@@ -530,159 +679,201 @@ internal object MyPlaceAddFix {
                                     if (rect.width <= 0 || rect.height <= 0) continue;
                                     
                                     var style = window.getComputedStyle(el);
-                                    var bgColor = style.backgroundColor || '';
                                     var borderRadius = style.borderRadius || '';
-                                    var width = rect.width;
-                                    var height = rect.height;
                                     
-                                    // 원형 요소인지 확인 (더 넓은 범위)
+                                    // 원형 요소인지 확인
                                     var isCircular = (borderRadius.indexOf('50%') >= 0 || 
                                                      borderRadius.indexOf('999') >= 0 || 
                                                      borderRadius.indexOf('1000') >= 0 ||
-                                                     (Math.abs(width - height) < 15 && width > 40 && width < 400));
+                                                     (Math.abs(rect.width - rect.height) < 20 && rect.width > 40 && rect.width < 400));
                                     
-                                    if (!isCircular || width < 40 || height < 40) continue;
+                                    if (!isCircular || rect.width < 40 || rect.height < 40) continue;
                                     
-                                    // 매니저/멤버 영역인지 확인
-                                    var parentText = '';
-                                    var current = el;
-                                    for (var p = 0; p < 10 && current; p++) {
-                                        var text = (current.innerText || current.textContent || '').replace(/\s/g, '');
-                                        if (text.indexOf('매니저') >= 0 || text.indexOf('Manager') >= 0) {
-                                            parentText = 'manager';
-                                            break;
+                                    // 매니저/멤버 텍스트 찾기 (현재 요소와 자식 요소에서)
+                                    var text = (el.innerText || el.textContent || '').replace(/\s/g, '');
+                                    var isManager = (text.indexOf('매니저') >= 0 || text.indexOf('Manager') >= 0);
+                                    var isMember = (text.indexOf('멤버') >= 0 || text.indexOf('Member') >= 0);
+                                    
+                                    if (!isManager && !isMember) {
+                                        // 부모 요소에서도 확인
+                                        var parent = el.parentElement;
+                                        for (var p = 0; p < 3 && parent; p++) {
+                                            var parentText = (parent.innerText || parent.textContent || '').replace(/\s/g, '');
+                                            if (parentText.indexOf('매니저') >= 0 || parentText.indexOf('Manager') >= 0) {
+                                                isManager = true;
+                                                break;
+                                            }
+                                            if (parentText.indexOf('멤버') >= 0 || parentText.indexOf('Member') >= 0) {
+                                                isMember = true;
+                                                break;
+                                            }
+                                            parent = parent.parentElement;
                                         }
-                                        if (text.indexOf('멤버') >= 0 || text.indexOf('Member') >= 0) {
-                                            parentText = 'member';
-                                            break;
-                                        }
-                                        current = current.parentElement;
                                     }
                                     
-                                    // 회색 배경 감지 (더 넓은 범위)
+                                    if (!isManager && !isMember) continue;
+                                    
+                                    // 선택 상태 확인 (체크마크, border 색상, 배경색 등)
+                                    var borderColor = style.borderColor || '';
+                                    var bgColor = style.backgroundColor || '';
                                     var bgColorLower = bgColor.toLowerCase();
-                                    var isGray = (bgColorLower.indexOf('rgb(245') >= 0 || 
-                                                 bgColorLower.indexOf('rgb(240') >= 0 || 
-                                                 bgColorLower.indexOf('rgb(229') >= 0 ||
-                                                 bgColorLower.indexOf('rgb(243') >= 0 ||
-                                                 bgColorLower.indexOf('rgb(238') >= 0 ||
-                                                 bgColorLower.indexOf('rgb(250') >= 0 ||
-                                                 bgColorLower.indexOf('rgb(251') >= 0 ||
-                                                 bgColorLower.indexOf('rgb(252') >= 0 ||
-                                                 bgColorLower.indexOf('rgb(253') >= 0 ||
-                                                 bgColorLower.indexOf('rgb(254') >= 0 ||
-                                                 bgColorLower.indexOf('gray') >= 0 ||
-                                                 bgColorLower.indexOf('grey') >= 0 ||
-                                                 bgColorLower === 'rgb(245, 246, 248)' ||
-                                                 bgColorLower === 'rgba(245, 246, 248, 1)' ||
-                                                 bgColorLower === 'rgba(245, 246, 248, 0.5)' ||
-                                                 bgColorLower === 'rgba(245, 246, 248, 0.8)');
                                     
-                                    // 매니저 영역이면 회색 배경 제거, 멤버 영역이면 회색 배경으로 통일
-                                    if (parentText === 'manager' && isGray) {
-                                        // 매니저: 회색 배경을 투명하게 제거
-                                        el.style.setProperty('background-color', 'transparent', 'important');
-                                        el.style.setProperty('background', 'transparent', 'important');
-                                        el.style.setProperty('background-image', 'none', 'important');
-                                    } else if (parentText === 'member') {
-                                        // 멤버: 회색 배경으로 통일
-                                        el.style.setProperty('background-color', '#F5F6F8', 'important');
-                                        el.style.setProperty('background', '#F5F6F8', 'important');
-                                        el.style.setProperty('background-image', 'none', 'important');
-                                    }
-                                }
-                                
-                                // ✅ 매니저 텍스트 주변의 모든 부모 요소 체크 (매니저만 특별 처리)
-                                var textElements = document.querySelectorAll('*');
-                                for (var t = 0; t < textElements.length; t++) {
-                                    var textEl = textElements[t];
-                                    var text = (textEl.innerText || textEl.textContent || '').replace(/\s/g, '');
-                                    
-                                    // 매니저 텍스트가 있는 경우 더 강력하게 처리
-                                    if (text.indexOf('매니저') >= 0 || text.indexOf('Manager') >= 0) {
-                                        var current = textEl;
-                                        for (var level = 0; level < 20 && current; level++) {
-                                            var currentStyle = window.getComputedStyle(current);
-                                            var currentBg = (currentStyle.backgroundColor || '').toLowerCase();
-                                            var currentBorderRadius = (currentStyle.borderRadius || '').toLowerCase();
-                                            var currentRect = current.getBoundingClientRect();
-                                            
-                                            if (currentRect.width > 30 && currentRect.height > 30) {
-                                                // 회색 배경 감지 (더 넓은 범위)
-                                                var isCurrentGray = (currentBg.indexOf('rgb(245') >= 0 || 
-                                                                     currentBg.indexOf('rgb(240') >= 0 || 
-                                                                     currentBg.indexOf('rgb(229') >= 0 ||
-                                                                     currentBg.indexOf('rgb(243') >= 0 ||
-                                                                     currentBg.indexOf('rgb(238') >= 0 ||
-                                                                     currentBg.indexOf('rgb(250') >= 0 ||
-                                                                     currentBg.indexOf('rgb(251') >= 0 ||
-                                                                     currentBg.indexOf('rgb(252') >= 0 ||
-                                                                     currentBg.indexOf('rgb(253') >= 0 ||
-                                                                     currentBg.indexOf('rgb(254') >= 0 ||
-                                                                     currentBg.indexOf('gray') >= 0 ||
-                                                                     currentBg.indexOf('grey') >= 0 ||
-                                                                     currentBg === 'rgb(245, 246, 248)' ||
-                                                                     currentBg === 'rgba(245, 246, 248, 1)' ||
-                                                                     currentBg === 'rgba(245, 246, 248, 0.5)' ||
-                                                                     currentBg === 'rgba(245, 246, 248, 0.8)');
-                                                
-                                                // 원형 요소인지 확인
-                                                var isCurrentCircular = (currentBorderRadius.indexOf('50%') >= 0 || 
-                                                                         currentBorderRadius.indexOf('999') >= 0 ||
-                                                                         currentBorderRadius.indexOf('1000') >= 0 ||
-                                                                         (Math.abs(currentRect.width - currentRect.height) < 20 && 
-                                                                          currentRect.width > 30 && currentRect.width < 500));
-                                                
-                                                // 회색이거나 원형이면 모두 제거
-                                                if (isCurrentGray || isCurrentCircular) {
-                                                    current.style.setProperty('background-color', 'transparent', 'important');
-                                                    current.style.setProperty('background', 'transparent', 'important');
-                                                    current.style.setProperty('background-image', 'none', 'important');
-                                                }
+                                    // 하단에 체크마크가 있는지 확인
+                                    var hasCheckmarkBelow = false;
+                                    var nextSibling = el.nextElementSibling;
+                                    if (nextSibling) {
+                                        var checkmarkSvg = nextSibling.querySelector('svg, path[d*="M"], path[d*="m"]');
+                                        if (checkmarkSvg) {
+                                            var checkmarkRect = checkmarkSvg.getBoundingClientRect();
+                                            if (checkmarkRect.width > 0 && checkmarkRect.height > 0) {
+                                                hasCheckmarkBelow = true;
                                             }
-                                            current = current.parentElement;
                                         }
                                     }
                                     
-                                    // 멤버 텍스트가 있는 경우 회색 배경으로 통일
-                                    if (text.indexOf('멤버') >= 0 || text.indexOf('Member') >= 0) {
-                                        var current = textEl;
-                                        for (var level = 0; level < 20 && current; level++) {
-                                            var currentStyle = window.getComputedStyle(current);
-                                            var currentBorderRadius = (currentStyle.borderRadius || '').toLowerCase();
-                                            var currentRect = current.getBoundingClientRect();
-                                            
-                                            if (currentRect.width > 30 && currentRect.height > 30) {
-                                                // 원형 요소인지 확인
-                                                var isCurrentCircular = (currentBorderRadius.indexOf('50%') >= 0 || 
-                                                                         currentBorderRadius.indexOf('999') >= 0 ||
-                                                                         currentBorderRadius.indexOf('1000') >= 0 ||
-                                                                         (Math.abs(currentRect.width - currentRect.height) < 20 && 
-                                                                          currentRect.width > 30 && currentRect.width < 500));
-                                                
-                                                // 원형 요소면 회색 배경으로 통일
-                                                if (isCurrentCircular) {
-                                                    current.style.setProperty('background-color', '#F5F6F8', 'important');
-                                                    current.style.setProperty('background', '#F5F6F8', 'important');
-                                                    current.style.setProperty('background-image', 'none', 'important');
-                                                }
-                                            }
-                                            current = current.parentElement;
+                                    // 내부에 체크마크가 있는지 확인
+                                    var hasCheckmarkInside = el.querySelector('svg, path[d*="M"], path[d*="m"]') !== null;
+                                    
+                                    // 선택 상태 판단
+                                    var isSelected = el.getAttribute('aria-selected') === 'true' ||
+                                                   el.classList.contains('selected') ||
+                                                   el.classList.contains('active') ||
+                                                   hasCheckmarkBelow ||
+                                                   hasCheckmarkInside ||
+                                                   borderColor.indexOf('rgb(59') >= 0 || // 파란색 border
+                                                   borderColor.indexOf('rgb(37') >= 0 ||
+                                                   borderColor.indexOf('rgb(96') >= 0 || // 파란색 border (다른 색상)
+                                                   bgColorLower.indexOf('#e0e6ff') >= 0 || // 이미 파란색 배경
+                                                   bgColorLower.indexOf('#e0f5e0') >= 0 || // 이미 초록색 배경
+                                                   bgColorLower.indexOf('rgb(224, 230, 255)') >= 0 || // 파란색 배경
+                                                   bgColorLower.indexOf('rgb(224, 245, 224)') >= 0; // 초록색 배경
+                                    
+                                    if (isSelected) {
+                                        if (isManager) {
+                                            // 매니저 선택 시: 밝은 파란색 배경 (#E0E6FF)
+                                            el.style.setProperty('background-color', '#E0E6FF', 'important');
+                                            el.style.setProperty('background', '#E0E6FF', 'important');
+                                            el.style.setProperty('border-color', '#C0CCFF', 'important');
+                                        } else if (isMember) {
+                                            // 멤버 선택 시: 밝은 초록색 배경 (#E0F5E0)
+                                            el.style.setProperty('background-color', '#E0F5E0', 'important');
+                                            el.style.setProperty('background', '#E0F5E0', 'important');
+                                            el.style.setProperty('border-color', '#B0E0B0', 'important');
+                                        }
+                                    } else {
+                                        // 선택되지 않은 경우 기본 배경 (투명)
+                                        var currentBg = bgColorLower;
+                                        // 이미 파란색이나 초록색이 아니면 투명으로 설정
+                                        if (currentBg.indexOf('#e0e6ff') < 0 && 
+                                            currentBg.indexOf('#e0f5e0') < 0 &&
+                                            currentBg.indexOf('rgb(224, 230, 255)') < 0 &&
+                                            currentBg.indexOf('rgb(224, 245, 224)') < 0) {
+                                            el.style.setProperty('background-color', 'transparent', 'important');
+                                            el.style.setProperty('background', 'transparent', 'important');
                                         }
                                     }
                                 }
                             } catch(e) {
-                                // 에러 무시
+                                console.log('MANAGER_MEMBER_BG_ERR', e && e.message);
                             }
                         }
                         
-                        removeGrayBackgroundBehindIcons();
-                        setTimeout(removeGrayBackgroundBehindIcons, 50);
-                        setTimeout(removeGrayBackgroundBehindIcons, 100);
-                        setTimeout(removeGrayBackgroundBehindIcons, 200);
-                        setTimeout(removeGrayBackgroundBehindIcons, 300);
-                        setTimeout(removeGrayBackgroundBehindIcons, 500);
-                        setTimeout(removeGrayBackgroundBehindIcons, 800);
+                        // ✅ 전역 함수 호출 (안전하게 호출)
+                        try {
+                          if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                            removeGrayBackgroundBehindIcons();
+                          } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                            window.removeGrayBackgroundBehindIcons();
+                          }
+                        } catch(e) {}
+                        
+                        setTimeout(function() {
+                          try {
+                            if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                              removeGrayBackgroundBehindIcons();
+                            } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                              window.removeGrayBackgroundBehindIcons();
+                            }
+                          } catch(e) {}
+                        }, 50);
+                        setTimeout(function() {
+                          try {
+                            if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                              removeGrayBackgroundBehindIcons();
+                            } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                              window.removeGrayBackgroundBehindIcons();
+                            }
+                          } catch(e) {}
+                        }, 100);
+                        setTimeout(function() {
+                          try {
+                            if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                              removeGrayBackgroundBehindIcons();
+                            } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                              window.removeGrayBackgroundBehindIcons();
+                            }
+                          } catch(e) {}
+                        }, 200);
+                        setTimeout(function() {
+                          try {
+                            if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                              removeGrayBackgroundBehindIcons();
+                            } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                              window.removeGrayBackgroundBehindIcons();
+                            }
+                          } catch(e) {}
+                        }, 300);
+                        setTimeout(function() {
+                          try {
+                            if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                              removeGrayBackgroundBehindIcons();
+                            } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                              window.removeGrayBackgroundBehindIcons();
+                            }
+                          } catch(e) {}
+                        }, 500);
+                        setTimeout(function() {
+                          try {
+                            if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                              removeGrayBackgroundBehindIcons();
+                            } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                              window.removeGrayBackgroundBehindIcons();
+                            }
+                          } catch(e) {}
+                        }, 800);
+                        
+                        // ✅ 매니저/멤버 선택 시 배경색 변경
+                        applyManagerMemberBackgroundColors();
+                        setTimeout(applyManagerMemberBackgroundColors, 50);
+                        setTimeout(applyManagerMemberBackgroundColors, 100);
+                        setTimeout(applyManagerMemberBackgroundColors, 200);
+                        setTimeout(applyManagerMemberBackgroundColors, 300);
+                        setTimeout(applyManagerMemberBackgroundColors, 500);
+                        
+                        // ✅ 클릭 이벤트 리스너 추가 (실시간 배경색 변경)
+                        if (!window.__db_manager_member_bg_listeners_added__) {
+                            window.__db_manager_member_bg_listeners_added__ = true;
+                            document.addEventListener('click', function(e) {
+                                setTimeout(function() {
+                                    applyManagerMemberBackgroundColors();
+                                }, 50);
+                            }, true);
+                            
+                            // MutationObserver로 DOM 변경 감지
+                            var bgObserver = new MutationObserver(function() {
+                                setTimeout(function() {
+                                    applyManagerMemberBackgroundColors();
+                                }, 100);
+                            });
+                            if (document.body) {
+                                bgObserver.observe(document.body, {
+                                    childList: true,
+                                    subtree: true,
+                                    attributes: true,
+                                    attributeFilter: ['class', 'style', 'aria-selected']
+                                });
+                            }
+                        }
 
                         // ✅ 매니저/멤버 옵션 간격 조정 (여러 번 실행하여 확실히 적용)
                         adjustOptionSpacing();
@@ -779,7 +970,13 @@ internal object MyPlaceAddFix {
                 if (!window.__dangbun_remove_gray_bg_interval__) {
                   window.__dangbun_remove_gray_bg_interval__ = setInterval(function() {
                     if (isAddPlace()) {
-                      removeGrayBackgroundBehindIcons();
+                      try {
+                        if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                          removeGrayBackgroundBehindIcons();
+                        } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                          window.removeGrayBackgroundBehindIcons();
+                        }
+                      } catch(e) {}
                     }
                   }, 200);
                 }
