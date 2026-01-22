@@ -79,7 +79,8 @@ fun DangbunWebViewScreen(
      * - myplace / placemake 에서만 사용
      */
     fun injectGrayTopBandKiller(view: WebView) {
-        val js = """
+        val js =
+            """
             (function () {
               var GRAY_BG = '${GRAY_BG_HEX}';
               var styleId = '__db_gray_topband_killer__';
@@ -107,7 +108,7 @@ fun DangbunWebViewScreen(
               document.documentElement.style.backgroundColor = GRAY_BG;
               if (document.body) document.body.style.backgroundColor = GRAY_BG;
             })();
-        """.trimIndent()
+            """.trimIndent()
 
         view.evaluateJavascript(js, null)
     }
@@ -120,7 +121,8 @@ fun DangbunWebViewScreen(
      * SPA라서 head에 남아있는 style 때문에 배경색이 섞이는 현상을 방지
      */
     fun injectAddPlaceGrayBackground(view: WebView) {
-        val js = """
+        val js =
+            """
             (function () {
               // 1) 이전 흰색/회색 강제 스타일 제거
               var whiteStyle = document.getElementById('__db_addplace_white_bg__');
@@ -159,13 +161,16 @@ fun DangbunWebViewScreen(
               // 디버그 로그(원하면 나중에 삭제 가능)
               console.log('[DB_ADDPLACE_GRAY_BG] applied');
             })();
-        """.trimIndent()
+            """.trimIndent()
 
         view.evaluateJavascript(js, null)
     }
 
     // ✅ 라우터 적용 (페이지 로드 + SPA 이동 모두 동일 처리)
-    fun applyRouteFix(pathRaw: String, view: WebView) {
+    fun applyRouteFix(
+        pathRaw: String,
+        view: WebView,
+    ) {
         val path = pathRaw.lowercase()
 
         // ✅ addPlace는 회색 배경으로 통일
@@ -173,7 +178,7 @@ fun DangbunWebViewScreen(
             when {
                 path.contains("myplace") -> Color(0xFFF5F6F8)
                 path.contains("placemake") -> Color(0xFFF5F6F8)
-                path.contains("addplace") -> Color(0xFFF5F6F8)  // 회색으로 변경
+                path.contains("addplace") -> Color(0xFFF5F6F8) // 회색으로 변경
                 else -> Color.White
             }
 
@@ -218,105 +223,112 @@ fun DangbunWebViewScreen(
         }
     }
 
-    val webView = remember {
-        WebView(context).apply {
-            Log.d(TAG, "WebView init, startUrl=$url")
+    val webView =
+        remember {
+            WebView(context).apply {
+                Log.d(TAG, "WebView init, startUrl=$url")
 
-            // ✅ WebView 자체 배경 투명 + 오버스크롤 제거
-            setBackgroundColor(AColor.TRANSPARENT)
-            background = null
-            overScrollMode = WebView.OVER_SCROLL_NEVER
+                // ✅ WebView 자체 배경 투명 + 오버스크롤 제거
+                setBackgroundColor(AColor.TRANSPARENT)
+                background = null
+                overScrollMode = WebView.OVER_SCROLL_NEVER
 
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.useWideViewPort = true
-            settings.loadWithOverviewMode = false
-            settings.setSupportZoom(true)
-            settings.builtInZoomControls = true
-            settings.displayZoomControls = false
-            settings.javaScriptCanOpenWindowsAutomatically = true
-            settings.setSupportMultipleWindows(true)
-            settings.cacheMode = WebSettings.LOAD_DEFAULT
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                settings.useWideViewPort = true
+                settings.loadWithOverviewMode = false
+                settings.setSupportZoom(true)
+                settings.builtInZoomControls = true
+                settings.displayZoomControls = false
+                settings.javaScriptCanOpenWindowsAutomatically = true
+                settings.setSupportMultipleWindows(true)
+                settings.cacheMode = WebSettings.LOAD_DEFAULT
 
-            val defaultUa = settings.userAgentString
-            settings.userAgentString = "$defaultUa Mobile"
+                val defaultUa = settings.userAgentString
+                settings.userAgentString = "$defaultUa Mobile"
 
-            webChromeClient = object : WebChromeClient() {
-                override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
-                    val msg = consoleMessage.message() ?: ""
-                    Log.e(
-                        TAG,
-                        "WV_CONSOLE(${consoleMessage.messageLevel()}): $msg " +
-                            "(${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})"
-                    )
+                webChromeClient =
+                    object : WebChromeClient() {
+                        override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                            val msg = consoleMessage.message() ?: ""
+                            Log.e(
+                                TAG,
+                                "WV_CONSOLE(${consoleMessage.messageLevel()}): $msg " +
+                                    "(${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})",
+                            )
 
-                    // ✅ SPA 이동도 즉시 처리
-                    if (msg.startsWith("SPA_NAV_DETECTED")) {
-                        val detectedPath = msg.removePrefix("SPA_NAV_DETECTED").trim()
-                        this@apply.post {
-                            applyRouteFix(detectedPath, this@apply)
+                            // ✅ SPA 이동도 즉시 처리
+                            if (msg.startsWith("SPA_NAV_DETECTED")) {
+                                val detectedPath = msg.removePrefix("SPA_NAV_DETECTED").trim()
+                                this@apply.post {
+                                    applyRouteFix(detectedPath, this@apply)
+                                }
+                            }
+                            return super.onConsoleMessage(consoleMessage)
                         }
                     }
-                    return super.onConsoleMessage(consoleMessage)
-                }
+
+                webViewClient =
+                    object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView,
+                            request: WebResourceRequest,
+                        ): Boolean {
+                            return handleUrl(context, request.url.toString(), view)
+                        }
+
+                        override fun onPageFinished(
+                            view: WebView,
+                            url: String,
+                        ) {
+                            super.onPageFinished(view, url)
+                            view.post { view.scrollTo(0, 0) }
+
+                            val path = runCatching { Uri.parse(url).path.orEmpty() }.getOrDefault("")
+
+                            // ✅ 공통 픽스
+                            injectCommonFixes(view)
+                            injectSplashFix(view)
+                            if (url.contains("kakao.com")) injectKakaoLtrFix(view)
+
+                            // ✅ 페이지 로드에서도 동일 적용
+                            applyRouteFix(path, view)
+
+                            // ✅ SPA 네비게이션 감지 설치(유지)
+                            view.evaluateJavascript(
+                                """
+                                (function() {
+                                  if (window.__dangbun_spa_hook__) return;
+                                  window.__dangbun_spa_hook__ = true;
+                                  var notify = function() {
+                                    console.log('SPA_NAV_DETECTED', location.pathname);
+                                  };
+                                  var _ps = history.pushState;
+                                  history.pushState = function() { _ps.apply(this, arguments); notify(); };
+                                  var _rs = history.replaceState;
+                                  history.replaceState = function() { _rs.apply(this, arguments); notify(); };
+                                  window.addEventListener('popstate', notify);
+                                })();
+                                """.trimIndent(),
+                                null,
+                            )
+                        }
+                    }
+
+                addJavascriptInterface(DangbunJsBridge(context), "DangbunBridge")
+                loadUrl(url)
             }
-
-            webViewClient = object : WebViewClient() {
-                override fun shouldOverrideUrlLoading(
-                    view: WebView,
-                    request: WebResourceRequest
-                ): Boolean {
-                    return handleUrl(context, request.url.toString(), view)
-                }
-
-                override fun onPageFinished(view: WebView, url: String) {
-                    super.onPageFinished(view, url)
-                    view.post { view.scrollTo(0, 0) }
-
-                    val path = runCatching { Uri.parse(url).path.orEmpty() }.getOrDefault("")
-
-                    // ✅ 공통 픽스
-                    injectCommonFixes(view)
-                    injectSplashFix(view)
-                    if (url.contains("kakao.com")) injectKakaoLtrFix(view)
-
-                    // ✅ 페이지 로드에서도 동일 적용
-                    applyRouteFix(path, view)
-
-                    // ✅ SPA 네비게이션 감지 설치(유지)
-                    view.evaluateJavascript(
-                        """
-                        (function() {
-                          if (window.__dangbun_spa_hook__) return;
-                          window.__dangbun_spa_hook__ = true;
-                          var notify = function() {
-                            console.log('SPA_NAV_DETECTED', location.pathname);
-                          };
-                          var _ps = history.pushState;
-                          history.pushState = function() { _ps.apply(this, arguments); notify(); };
-                          var _rs = history.replaceState;
-                          history.replaceState = function() { _rs.apply(this, arguments); notify(); };
-                          window.addEventListener('popstate', notify);
-                        })();
-                        """.trimIndent(),
-                        null
-                    )
-                }
-            }
-
-            addJavascriptInterface(DangbunJsBridge(context), "DangbunBridge")
-            loadUrl(url)
         }
-    }
 
     BackHandler {
         if (webView.canGoBack()) webView.goBack() else onClose()
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(containerBg)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(containerBg),
     ) {
         AndroidView(
             modifier =
@@ -327,7 +339,7 @@ fun DangbunWebViewScreen(
                 } else {
                     Modifier.fillMaxSize()
                 },
-            factory = { webView }
+            factory = { webView },
         )
     }
 }
