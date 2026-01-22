@@ -1,6 +1,7 @@
 package com.example.dangbun.ui.webview.fixes.addplace
 
 import android.webkit.WebView
+import com.example.dangbun.ui.webview.fixes.common.ResponsiveUtils
 
 internal object PlaceJoin1LayoutFix {
 
@@ -19,9 +20,16 @@ internal object PlaceJoin1LayoutFix {
     private fun provideJs(raisePx: Int, liftBottomPx: Int): String {
         return """
         (function() {
+          // ✅ 반응형 유틸리티 로드
+          if (!window.__dangbun_responsive_utils__) {
+            ${ResponsiveUtils.getResponsiveJs()}
+          }
+
           var STYLE_ID = '__db_placejoin1_layout_fix__';
           var CLASS_TOP = 'db-placejoin1-top-raised';
           var HTML_ATTR = 'data-db-placejoin1';
+          var BASE_RAISE_PX = ${raisePx};
+          var BASE_LIFT_BOTTOM_PX = ${liftBottomPx};
 
           function isPlaceJoin1() {
             try {
@@ -46,11 +54,15 @@ internal object PlaceJoin1LayoutFix {
               document.head.appendChild(style);
             }
 
+            // ✅ 화면 크기에 따라 동적으로 계산
+            var responsiveRaisePx = window.getResponsivePx ? window.getResponsivePx(BASE_RAISE_PX, 'height') : BASE_RAISE_PX;
+            var responsiveLiftPx = window.getResponsivePx ? window.getResponsivePx(BASE_LIFT_BOTTOM_PX, 'height') : BASE_LIFT_BOTTOM_PX;
+
             // ✅ template literal(백틱) 안 쓰고 + 로만 구성 (SyntaxError 방지)
             style.textContent =
               /* 1) 참여코드 영역 올리기 */
               '.' + CLASS_TOP + '{' +
-                'margin-top:-' + ${raisePx} + 'px !important;' +
+                'margin-top:-' + responsiveRaisePx + 'px !important;' +
               '}' +
 
               /* 2) "완료" 하단 버튼 위로 올리기 (PlaceJoin1에서만) */
@@ -61,7 +73,7 @@ internal object PlaceJoin1LayoutFix {
               'html[' + HTML_ATTR + '="1"] [class*="Bottom"][class*="Fixed"],' +
               'html[' + HTML_ATTR + '="1"] [class*="sticky"][class*="bottom"],' +
               'html[' + HTML_ATTR + '="1"] [class*="Sticky"][class*="Bottom"]' +
-              '{ transform: translateY(-' + ${liftBottomPx} + 'px) !important; }';
+              '{ transform: translateY(-' + responsiveLiftPx + 'px) !important; }';
           }
 
           function removeStyle() {
@@ -131,8 +143,25 @@ internal object PlaceJoin1LayoutFix {
             var w = findTopWrapper();
             if (w && !w.classList.contains(CLASS_TOP)) {
               w.classList.add(CLASS_TOP);
-              console.log('PLACEJOIN1_LAYOUT_APPLIED', 'raisePx=' + ${raisePx}, 'liftBottomPx=' + ${liftBottomPx});
+              var responsiveRaisePx = window.getResponsivePx ? window.getResponsivePx(BASE_RAISE_PX, 'height') : BASE_RAISE_PX;
+              var responsiveLiftPx = window.getResponsivePx ? window.getResponsivePx(BASE_LIFT_BOTTOM_PX, 'height') : BASE_LIFT_BOTTOM_PX;
+              console.log('PLACEJOIN1_LAYOUT_APPLIED', 'raisePx=' + responsiveRaisePx, 'liftBottomPx=' + responsiveLiftPx);
             }
+          }
+
+          // ✅ 화면 크기 변경 시에도 재계산되도록 리사이즈 이벤트 추가
+          if (!window.__dangbun_placejoin1_resize_handler__) {
+              window.__dangbun_placejoin1_resize_handler__ = true;
+              var resizeTimer;
+              window.addEventListener('resize', function() {
+                  clearTimeout(resizeTimer);
+                  resizeTimer = setTimeout(function() {
+                      if (isPlaceJoin1() && hasTargetText()) {
+                          ensureStyle(); // 스타일 재계산
+                          apply(); // 다시 적용
+                      }
+                  }, 100);
+              });
           }
 
           apply();

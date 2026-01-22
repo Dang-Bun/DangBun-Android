@@ -1,6 +1,7 @@
 package com.example.dangbun.ui.webview.fixes.addplace
 
 import android.webkit.WebView
+import com.example.dangbun.ui.webview.fixes.common.ResponsiveUtils
 
 internal object PlaceMake3TopInsetFix {
 
@@ -13,12 +14,18 @@ internal object PlaceMake3TopInsetFix {
         return """
         (function() {
           try {
+            // ✅ 반응형 유틸리티 로드
+            if (!window.__dangbun_responsive_utils__) {
+              ${ResponsiveUtils.getResponsiveJs()}
+            }
+
             var STYLE_ID = '__db_placemake3_top_inset_fix__';
             var CLASS_NAME = 'db-placemake3-content-down';
             var HTML_ATTR = 'data-db-placemake3';
+            var BASE_DOWN_PX = ${downPx};
 
-            // ✅ 하단 "플레이스 이동" 버튼을 살짝 위로 올릴 값
-            var MOVE_BTN_RAISE_PX = 24;
+            // ✅ 하단 "플레이스 이동" 버튼을 살짝 위로 올릴 값 (반응형)
+            var MOVE_BTN_RAISE_PX_BASE = 24;
             var MOVE_APPLIED_ATTR = 'data-db-movebtn-raised';
 
             function isPlaceMake3() {
@@ -36,12 +43,13 @@ internal object PlaceMake3TopInsetFix {
                 document.head.appendChild(style);
               }
 
-              style.textContent = `
-                /* ✅ placemake3에서만 적용 */
-                html[${'$'}{HTML_ATTR}="1"] .${'$'}{CLASS_NAME} {
-                  margin-top: ${downPx}px !important; /* ✅ 아래로 내리기 */
-                }
-              `;
+              // ✅ 화면 크기에 따라 동적으로 계산
+              var responsivePx = window.getResponsivePx ? window.getResponsivePx(BASE_DOWN_PX, 'height') : BASE_DOWN_PX;
+
+              style.textContent = 
+                'html[' + HTML_ATTR + '="1"] .' + CLASS_NAME + '{' +
+                  'margin-top: ' + responsivePx + 'px !important;' +
+                '}';
             }
 
             function removeStyle() {
@@ -144,20 +152,23 @@ internal object PlaceMake3TopInsetFix {
 
                 if (btn.getAttribute(MOVE_APPLIED_ATTR) === '1') return;
 
+                // ✅ 반응형 계산
+                var moveRaisePx = window.getResponsivePx ? window.getResponsivePx(MOVE_BTN_RAISE_PX_BASE, 'height') : MOVE_BTN_RAISE_PX_BASE;
+
                 // 1) 버튼 자체를 위로 올림
-                btn.style.transform = 'translateY(-' + MOVE_BTN_RAISE_PX + 'px)';
+                btn.style.transform = 'translateY(-' + moveRaisePx + 'px)';
                 btn.style.willChange = 'transform';
                 btn.setAttribute(MOVE_APPLIED_ATTR, '1');
 
                 // 2) fixed 부모가 있으면 부모도 같이 올림
                 var fixedParent = findFixedParent(btn);
                 if (fixedParent && fixedParent.getAttribute(MOVE_APPLIED_ATTR) !== '1') {
-                  fixedParent.style.transform = 'translateY(-' + MOVE_BTN_RAISE_PX + 'px)';
+                  fixedParent.style.transform = 'translateY(-' + moveRaisePx + 'px)';
                   fixedParent.style.willChange = 'transform';
                   fixedParent.setAttribute(MOVE_APPLIED_ATTR, '1');
                 }
 
-                console.log('PLACEMAKE3_MOVE_BTN_RAISED', 'px=' + MOVE_BTN_RAISE_PX);
+                console.log('PLACEMAKE3_MOVE_BTN_RAISED', 'px=' + moveRaisePx);
               } catch(e) {}
             }
 
@@ -182,6 +193,21 @@ internal object PlaceMake3TopInsetFix {
 
               // ✅ 하단 버튼도 살짝 위로
               raiseMoveButton();
+            }
+
+            // ✅ 화면 크기 변경 시에도 재계산되도록 리사이즈 이벤트 추가
+            if (!window.__dangbun_placemake3_resize_handler__) {
+                window.__dangbun_placemake3_resize_handler__ = true;
+                var resizeTimer;
+                window.addEventListener('resize', function() {
+                    clearTimeout(resizeTimer);
+                    resizeTimer = setTimeout(function() {
+                        if (isPlaceMake3()) {
+                            ensureStyle(); // 스타일 재계산
+                            manage(); // 다시 적용
+                        }
+                    }, 100);
+                });
             }
 
             manage();

@@ -1,6 +1,7 @@
 package com.example.dangbun.ui.webview.fixes.addplace
 
 import android.webkit.WebView
+import com.example.dangbun.ui.webview.fixes.common.ResponsiveUtils
 
 internal object PlaceMake2TopInsetFix {
 
@@ -12,11 +13,17 @@ internal object PlaceMake2TopInsetFix {
         return """
         (function() {
           try {
+            // ✅ 반응형 유틸리티 로드
+            if (!window.__dangbun_responsive_utils__) {
+              ${ResponsiveUtils.getResponsiveJs()}
+            }
+
             var STYLE_ID = '__db_placemake2_top_inset_fix__';
             var CLASS_NAME = 'db-placemake2-content-raise';
+            var BASE_RAISE_PX = ${raisePx};
 
-            // ✅ 완료 버튼을 "조금만" 위로 올리는 값
-            var COMPLETE_RAISE_PX = 24;
+            // ✅ 완료 버튼을 "조금만" 위로 올리는 값 (반응형)
+            var COMPLETE_RAISE_PX_BASE = 24;
             var COMPLETE_APPLIED_ATTR = 'data-db-complete-raised';
 
             function isPlaceMake2() {
@@ -34,18 +41,17 @@ internal object PlaceMake2TopInsetFix {
                 document.head.appendChild(style);
               }
 
-              style.textContent = `
-                /* ✅ 가운데 정렬(세로 중앙) 원인 제거: flex면 상단 정렬로 강제 */
-                html, body, #root, #__next, main {
-                  align-items: flex-start !important;
-                  justify-content: flex-start !important;
-                }
+              // ✅ 화면 크기에 따라 동적으로 계산
+              var responsivePx = window.getResponsivePx ? window.getResponsivePx(BASE_RAISE_PX, 'height') : BASE_RAISE_PX;
 
-                /* ✅ 실제 콘텐츠 래퍼만 위로 당김 */
-                .${'$'}{CLASS_NAME} {
-                  margin-top: -${raisePx}px !important;
-                }
-              `;
+              style.textContent = 
+                'html, body, #root, #__next, main {' +
+                  'align-items: flex-start !important;' +
+                  'justify-content: flex-start !important;' +
+                '}' +
+                '.' + CLASS_NAME + '{' +
+                  'margin-top: -' + responsivePx + 'px !important;' +
+                '}';
             }
 
             function removeStyle() {
@@ -153,8 +159,11 @@ internal object PlaceMake2TopInsetFix {
                 // 이미 적용했으면 스킵
                 if (btn.getAttribute(COMPLETE_APPLIED_ATTR) === '1') return;
 
+                // ✅ 반응형 계산
+                var completeRaisePx = window.getResponsivePx ? window.getResponsivePx(COMPLETE_RAISE_PX_BASE, 'height') : COMPLETE_RAISE_PX_BASE;
+
                 // 1) 버튼 자체를 살짝 위로
-                btn.style.transform = 'translateY(-' + COMPLETE_RAISE_PX + 'px)';
+                btn.style.transform = 'translateY(-' + completeRaisePx + 'px)';
                 btn.style.willChange = 'transform';
                 btn.setAttribute(COMPLETE_APPLIED_ATTR, '1');
 
@@ -162,12 +171,12 @@ internal object PlaceMake2TopInsetFix {
                 var fixedParent = findFixedParent(btn);
                 if (fixedParent && fixedParent.getAttribute(COMPLETE_APPLIED_ATTR) !== '1') {
                   // bottom 값을 올리거나, transform으로 올림(둘 중 하나만)
-                  fixedParent.style.transform = 'translateY(-' + COMPLETE_RAISE_PX + 'px)';
+                  fixedParent.style.transform = 'translateY(-' + completeRaisePx + 'px)';
                   fixedParent.style.willChange = 'transform';
                   fixedParent.setAttribute(COMPLETE_APPLIED_ATTR, '1');
                 }
 
-                console.log('PLACEMAKE2_COMPLETE_RAISED', 'px=' + COMPLETE_RAISE_PX);
+                console.log('PLACEMAKE2_COMPLETE_RAISED', 'px=' + completeRaisePx);
               } catch(e) {}
             }
 
@@ -190,6 +199,21 @@ internal object PlaceMake2TopInsetFix {
 
               // ✅ 완료 버튼/하단영역도 같이 올리기
               raiseCompleteArea();
+            }
+
+            // ✅ 화면 크기 변경 시에도 재계산되도록 리사이즈 이벤트 추가
+            if (!window.__dangbun_placemake2_resize_handler__) {
+                window.__dangbun_placemake2_resize_handler__ = true;
+                var resizeTimer;
+                window.addEventListener('resize', function() {
+                    clearTimeout(resizeTimer);
+                    resizeTimer = setTimeout(function() {
+                        if (isPlaceMake2()) {
+                            ensureStyle(); // 스타일 재계산
+                            apply(); // 다시 적용
+                        }
+                    }, 100);
+                });
             }
 
             apply();

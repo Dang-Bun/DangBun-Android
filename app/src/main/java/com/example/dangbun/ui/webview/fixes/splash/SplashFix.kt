@@ -2,12 +2,18 @@ package com.example.dangbun.ui.webview.fixes.splash
 
 import android.webkit.WebView
 import com.example.dangbun.ui.webview.SPLASH_BG_HEX
+import com.example.dangbun.ui.webview.fixes.common.ResponsiveUtils
 
 internal object SplashFix {
     internal fun injectSplashFix(view: WebView) {
         val js = """
         (function() {
           try {
+            // ✅ 반응형 유틸리티 로드
+            if (!window.__dangbun_responsive_utils__) {
+              ${ResponsiveUtils.getResponsiveJs()}
+            }
+
             var BG = '${SPLASH_BG_HEX}';
 
             function ensureViewportScale() {
@@ -18,7 +24,9 @@ internal object SplashFix {
                   meta.name = 'viewport';
                   document.head.appendChild(meta);
                 }
-                meta.content = 'width=device-width, initial-scale=0.8, maximum-scale=1.0, user-scalable=no';
+                // ✅ 화면 크기에 따라 동적으로 scale 계산
+                var scale = window.getResponsiveScale ? window.getResponsiveScale() : 0.8;
+                meta.content = 'width=device-width, initial-scale=' + scale + ', maximum-scale=1.0, user-scalable=no';
               } catch(e) {}
             }
 
@@ -85,14 +93,15 @@ internal object SplashFix {
             }
 
             function resetSplashCenter() {
-              // ✅ 온보딩(스플래시가 아닌 화면)에서만 상단 여백 살짝 추가
+              // ✅ 온보딩 화면에서는 상단 여백 최소화 (건너뛰기 버튼이 보이도록)
               try {
                 var root2 = document.querySelector('#root') || document.querySelector('#__next') || document.querySelector('#app');
                 var main2 = document.querySelector('main');
                 var host2 = main2 || root2;
 
                 if (host2) {
-                  host2.style.paddingTop = '60px';
+                  // ✅ 상단 여백을 최소화 (기존 60px -> 0px)
+                  host2.style.paddingTop = '0px';
                   host2.style.boxSizing = 'border-box';
                 }
               } catch(e) {}

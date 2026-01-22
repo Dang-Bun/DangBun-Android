@@ -8,8 +8,8 @@ import com.example.dangbun.ui.webview.fixes.myplace.MyPlaceFix
 import com.example.dangbun.ui.webview.fixes.onboarding.OnboardingTopInsetFix
 import com.example.dangbun.ui.webview.fixes.splash.SplashFix
 
-// ✅ 온보딩(상단 여백 내려오기) 픽스
-internal fun injectOnboardingTopInsetFix(view: WebView, topPx: Int = 24) {
+// ✅ 온보딩(상단 여백 최소화) 픽스
+internal fun injectOnboardingTopInsetFix(view: WebView, topPx: Int = 0) {
     OnboardingTopInsetFix.inject(view, topPx)
 }
 

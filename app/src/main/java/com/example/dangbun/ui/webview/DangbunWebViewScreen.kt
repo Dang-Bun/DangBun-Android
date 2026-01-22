@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowInsetsControllerCompat
+import com.example.dangbun.ui.webview.fixes.addplace.MyPlaceAddFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceJoin1LayoutFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake1TopInsetFix
 import com.example.dangbun.ui.webview.fixes.addplace.PlaceMake2TopInsetFix
@@ -112,24 +113,28 @@ fun DangbunWebViewScreen(
     }
 
     /**
-     * ✅ (추가) addPlace 진입 시:
-     * 1) 이전에 깔린 회색 강제 style(__db_gray_topband_killer__) 제거
-     * 2) 흰색 배경 강제 적용
+     * ✅ (수정) addPlace 진입 시:
+     * 1) 이전에 깔린 스타일 제거
+     * 2) 회색 배경 강제 적용 (흰색/회색 혼재 문제 해결)
      *
-     * SPA라서 head에 남아있는 style 때문에 "회색이 계속 끼는" 현상을 끊는 용도
+     * SPA라서 head에 남아있는 style 때문에 배경색이 섞이는 현상을 방지
      */
-    fun injectAddPlaceWhiteBackground(view: WebView) {
+    fun injectAddPlaceGrayBackground(view: WebView) {
         val js = """
             (function () {
-              // 1) 이전 회색 강제 스타일 제거
+              // 1) 이전 흰색/회색 강제 스타일 제거
+              var whiteStyle = document.getElementById('__db_addplace_white_bg__');
+              if (whiteStyle && whiteStyle.parentNode) {
+                whiteStyle.parentNode.removeChild(whiteStyle);
+              }
               var grayStyle = document.getElementById('__db_gray_topband_killer__');
               if (grayStyle && grayStyle.parentNode) {
                 grayStyle.parentNode.removeChild(grayStyle);
               }
 
-              // 2) 흰색 강제 스타일 적용(덮어쓰기)
-              var WHITE_BG = '${WHITE_BG_HEX}';
-              var styleId = '__db_addplace_white_bg__';
+              // 2) 회색 배경 강제 스타일 적용(통일)
+              var GRAY_BG = '${GRAY_BG_HEX}';
+              var styleId = '__db_addplace_gray_bg__';
               var style = document.getElementById(styleId);
               if (!style) {
                 style = document.createElement('style');
@@ -138,21 +143,21 @@ fun DangbunWebViewScreen(
               }
 
               style.textContent =
-                'html, body { background:' + WHITE_BG + ' !important; }' +
+                'html, body { background:' + GRAY_BG + ' !important; }' +
                 'body { margin:0 !important; padding:0 !important; }' +
-                '#root, #__next, main { background:' + WHITE_BG + ' !important; min-height:100vh !important; }' +
-                'header, nav, [role="banner"] { background:' + WHITE_BG + ' !important; }' +
-                '[class*="Header"], [class*="header"], [class*="AppBar"], [class*="appbar"], [class*="Top"], [class*="top"] { background:' + WHITE_BG + ' !important; }' +
-                '[class*="SafeArea"], [class*="safearea"], [class*="Inset"], [class*="inset"] { background:' + WHITE_BG + ' !important; }' +
+                '#root, #__next, main { background:' + GRAY_BG + ' !important; min-height:100vh !important; }' +
+                'header, nav, [role="banner"] { background:' + GRAY_BG + ' !important; }' +
+                '[class*="Header"], [class*="header"], [class*="AppBar"], [class*="appbar"], [class*="Top"], [class*="top"] { background:' + GRAY_BG + ' !important; }' +
+                '[class*="SafeArea"], [class*="safearea"], [class*="Inset"], [class*="inset"] { background:' + GRAY_BG + ' !important; }' +
                 'body:before { content:none !important; }'
               ;
 
-              // 3) 인라인도 흰색으로 고정
-              document.documentElement.style.backgroundColor = WHITE_BG;
-              if (document.body) document.body.style.backgroundColor = WHITE_BG;
+              // 3) 인라인도 회색으로 고정
+              document.documentElement.style.backgroundColor = GRAY_BG;
+              if (document.body) document.body.style.backgroundColor = GRAY_BG;
 
               // 디버그 로그(원하면 나중에 삭제 가능)
-              console.log('[DB_ADDPLACE_WHITE_BG] applied');
+              console.log('[DB_ADDPLACE_GRAY_BG] applied');
             })();
         """.trimIndent()
 
@@ -163,18 +168,18 @@ fun DangbunWebViewScreen(
     fun applyRouteFix(pathRaw: String, view: WebView) {
         val path = pathRaw.lowercase()
 
-        // ✅ addPlace는 "웹처럼 흰색"이 목표 => 컨테이너도 흰색으로
+        // ✅ addPlace는 회색 배경으로 통일
         containerBg =
             when {
                 path.contains("myplace") -> Color(0xFFF5F6F8)
                 path.contains("placemake") -> Color(0xFFF5F6F8)
-                path.contains("addplace") -> Color.White
+                path.contains("addplace") -> Color(0xFFF5F6F8)  // 회색으로 변경
                 else -> Color.White
             }
 
-        // ✅ 핵심: SPA에서 남아있는 회색 style을 addPlace에서 제거 + 흰색 강제
+        // ✅ 핵심: SPA에서 남아있는 스타일 제거 + 회색 배경 강제 (흰색/회색 혼재 문제 해결)
         if (path.contains("addplace")) {
-            injectAddPlaceWhiteBackground(view)
+            injectAddPlaceGrayBackground(view)
         } else if (path.contains("placemake") || path.contains("myplace")) {
             // ✅ 회색 화면군은 여기서만 회색 강제 주입
             injectGrayTopBandKiller(view)
@@ -185,7 +190,10 @@ fun DangbunWebViewScreen(
             injectMyPlaceUnifiedFix(view)
         }
 
-        // ✅ addPlace 라우터 픽스(현재 비활성 유지)
+        // ✅ addPlace 라우터 픽스: 상단 여백 줄이기 및 레이아웃 조정
+        if (path.contains("addplace")) {
+            MyPlaceAddFix.inject(view)
+        }
         // if (path.contains("addplace")) { injectAddPlaceMemberSelectInsetFix(view) }
 
         // ✅ placemake 라우터 픽스
@@ -202,6 +210,11 @@ fun DangbunWebViewScreen(
 
         if (path.contains("placejoin1")) {
             PlaceJoin1LayoutFix.inject(view, raisePx = 170, liftBottomPx = 24)
+        }
+
+        // ✅ 온보딩 화면 상단 여백 최소화
+        if (path.contains("onboarding")) {
+            injectOnboardingTopInsetFix(view, topPx = 0)
         }
     }
 

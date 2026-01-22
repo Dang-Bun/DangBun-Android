@@ -11,14 +11,22 @@ internal object CommonModalFix {
             if (window.__dangbun_modal_center_once__) return;
             window.__dangbun_modal_center_once__ = true;
 
-            // ✅ viewport는 기존 목적대로 유지
+            // ✅ 반응형 유틸리티 로드
+            if (!window.__dangbun_responsive_utils__) {
+              ${ResponsiveUtils.getResponsiveJs()}
+            }
+
+            // ✅ viewport는 화면 크기에 맞게 동적으로 조정
             var meta = document.querySelector('meta[name="viewport"]');
             if (!meta) {
               meta = document.createElement('meta');
               meta.name = 'viewport';
               document.head.appendChild(meta);
             }
-            meta.content = 'width=device-width, initial-scale=0.8, maximum-scale=1.0, user-scalable=no';
+            
+            // 화면 크기에 따라 동적으로 scale 계산
+            var scale = window.getResponsiveScale ? window.getResponsiveScale() : 0.8;
+            meta.content = 'width=device-width, initial-scale=' + scale + ', maximum-scale=1.0, user-scalable=no';
 
             // ✅ 가로 넘침 방지
             document.documentElement.style.width = '100%';

@@ -1,6 +1,7 @@
 package com.example.dangbun.ui.webview.fixes.addplace
 
 import android.webkit.WebView
+import com.example.dangbun.ui.webview.fixes.common.ResponsiveUtils
 
 internal object MyPlaceAddFix {
 
@@ -13,12 +14,23 @@ internal object MyPlaceAddFix {
         (function() {
           try {
             // ==========================================
-            // [설정 값 유지]
+            // [반응형 설정 값]
             // ==========================================
+            // ✅ 반응형 유틸리티 로드
+            if (!window.__dangbun_responsive_utils__) {
+              ${ResponsiveUtils.getResponsiveJs()}
+            }
+
             var GRAY_BG = '#F5F6F8';
-            var CONTENT_START_TOP = -110;   // ✅ 절대 변경하지 않음
-            var NEXT_BTN_BOTTOM = 60;
-            var BACK_BTN_DOWN = 20;
+            // ✅ 기준 값들을 화면 크기에 맞게 동적 계산
+            // ✅ 상단 여백 최소화: 콘텐츠를 더 많이 위로 올림
+            var CONTENT_START_TOP_BASE = -180;  // -150 -> -180 (더 위로 올림)
+            var NEXT_BTN_BOTTOM_BASE = 80;  // 60 -> 80 (다음 버튼을 위로 올림)
+            var BACK_BTN_DOWN_BASE = 40;  // 20 -> 40 (뒤로가기 버튼을 아래로 내림, translateY는 양수면 아래로)
+            
+            var CONTENT_START_TOP = window.getResponsivePx ? window.getResponsivePx(CONTENT_START_TOP_BASE, 'height') : CONTENT_START_TOP_BASE;
+            var NEXT_BTN_BOTTOM = window.getResponsivePx ? window.getResponsivePx(NEXT_BTN_BOTTOM_BASE, 'height') : NEXT_BTN_BOTTOM_BASE;
+            var BACK_BTN_DOWN = window.getResponsivePx ? window.getResponsivePx(BACK_BTN_DOWN_BASE, 'height') : BACK_BTN_DOWN_BASE;
 
             var STYLE_ID = '__db_addplace_css_hack_final__';
             var MOVED_BTN_CLASS = 'db-next-btn-moved-to-body'; // 납치한 버튼 식별용(이름은 유지)
@@ -126,10 +138,17 @@ internal object MyPlaceAddFix {
             // [1] 스타일 주입 및 제거
             // ==========================================
             function applyStyles() {
-                if (document.getElementById(STYLE_ID)) return;
+                var style = document.getElementById(STYLE_ID);
+                if (!style) {
+                    style = document.createElement('style');
+                    style.id = STYLE_ID;
+                    document.head.appendChild(style);
+                }
 
-                var style = document.createElement('style');
-                style.id = STYLE_ID;
+                // ✅ 화면 크기에 따라 동적으로 재계산
+                var contentTop = window.getResponsivePx ? window.getResponsivePx(CONTENT_START_TOP_BASE, 'height') : CONTENT_START_TOP_BASE;
+                var btnBottom = window.getResponsivePx ? window.getResponsivePx(NEXT_BTN_BOTTOM_BASE, 'height') : NEXT_BTN_BOTTOM_BASE;
+
                 style.textContent = `
                     html, body, #root, #__next, main {
                         background-color: ${'$'}{'$'}{GRAY_BG} !important;
@@ -150,9 +169,66 @@ internal object MyPlaceAddFix {
                         touch-action: none !important;
                     }
 
+                    /* ✅ 상단 여백 최소화: 뒤로가기 버튼과 텍스트 사이 간격 최소화 */
+                    header, nav, [role="banner"], [class*="Header"], [class*="header"], [class*="AppBar"], [class*="appbar"] {
+                        padding-top: 0 !important;
+                        margin-top: 0 !important;
+                        padding-bottom: 0 !important;
+                        margin-bottom: 0 !important;
+                        min-height: auto !important;
+                        height: auto !important;
+                    }
+
+                    /* ✅ 뒤로가기 버튼 영역의 여백 완전 제거 */
+                    button[aria-label*="뒤로"], button[aria-label*="back"], 
+                    a[aria-label*="뒤로"], a[aria-label*="back"],
+                    [class*="Back"], [class*="back"], 
+                    [class*="Arrow"], [class*="arrow"],
+                    svg, path {
+                        margin-top: 0 !important;
+                        padding-top: 0 !important;
+                        margin-bottom: 0 !important;
+                        padding-bottom: 0 !important;
+                    }
+
+                    /* ✅ 뒤로가기 버튼 바로 아래 요소들의 상단 여백 완전 제거 */
+                    main > *:first-child, #root > *:first-child, #__next > *:first-child,
+                    main > *:first-child > *:first-child, #root > *:first-child > *:first-child {
+                        margin-top: 0 !important;
+                        padding-top: 0 !important;
+                    }
+
+                    /* ✅ 질문 텍스트 영역의 상단 여백 제거 */
+                    h1, h2, h3, p, div {
+                        margin-top: 0 !important;
+                        padding-top: 0 !important;
+                    }
+
+                    /* ✅ 첫 번째 텍스트 요소의 여백 제거 */
+                    main h1:first-child, main h2:first-child, main h3:first-child,
+                    main p:first-child, main div:first-child,
+                    #root h1:first-child, #root h2:first-child, #root h3:first-child,
+                    #root p:first-child, #root div:first-child {
+                        margin-top: 0 !important;
+                        padding-top: 0 !important;
+                    }
+
+                    /* ✅ 매니저/멤버 옵션 간격 조정 */
+                    /* 모든 flex 컨테이너의 gap 증가 */
+                    [style*="display: flex"], [style*="display:flex"],
+                    [class*="flex"], [class*="Flex"] {
+                        gap: 20px !important;
+                    }
+
+                    /* 체크 표시 아이콘 아래 간격 넓히기 */
+                    svg, [class*="check"], [class*="Check"],
+                    [class*="icon"], [class*="Icon"] {
+                        margin-bottom: 16px !important;
+                    }
+
                     .db-force-content-pos {
                         position: absolute !important;
-                        top: ${'$'}{CONTENT_START_TOP}px !important;
+                        top: ${'$'}{contentTop}px !important;
                         left: 0px !important;
                         width: 100% !important;
                         margin: 0 !important;
@@ -163,7 +239,7 @@ internal object MyPlaceAddFix {
 
                     .${'$'}{MOVED_BTN_CLASS} {
                         position: fixed !important;
-                        bottom: ${'$'}{NEXT_BTN_BOTTOM}px !important;
+                        bottom: ${'$'}{btnBottom}px !important;
                         left: 16px !important;
                         right: 16px !important;
                         width: auto !important;
@@ -174,7 +250,6 @@ internal object MyPlaceAddFix {
                         transform: none !important;
                     }
                 `;
-                document.head.appendChild(style);
             }
 
             function removeStyles() {
@@ -232,6 +307,82 @@ internal object MyPlaceAddFix {
               } catch(e) { return null; }
             }
 
+            // ✅ 매니저/멤버 옵션 간격 조정 함수
+            function adjustOptionSpacing() {
+              try {
+                // "매니저" 텍스트를 포함한 요소 찾기
+                var allElements = document.querySelectorAll('div, p, span, h1, h2, h3');
+                var managerOption = null;
+                var memberOption = null;
+
+                for (var i = 0; i < allElements.length; i++) {
+                  var text = (allElements[i].innerText || '').replace(/\s/g, '');
+                  
+                  // 매니저 옵션 찾기
+                  if (text.indexOf('매니저') >= 0 || text.indexOf('Manager') >= 0) {
+                    if (!managerOption) {
+                      // 매니저 옵션의 루트 컨테이너 찾기
+                      var cur = allElements[i];
+                      for (var up = 0; up < 5; up++) {
+                        if (!cur || !cur.parentElement) break;
+                        cur = cur.parentElement;
+                        var rect = cur.getBoundingClientRect();
+                        // 적당한 크기의 컨테이너 찾기
+                        if (rect.width > window.innerWidth * 0.5 && rect.height > 100) {
+                          managerOption = cur;
+                          break;
+                        }
+                      }
+                    }
+                  }
+
+                  // 멤버 옵션 찾기
+                  if (text.indexOf('기존플레이스에참여할거에요') >= 0 || text.indexOf('참여할거에요') >= 0) {
+                    if (!memberOption) {
+                      var cur2 = allElements[i];
+                      for (var up2 = 0; up2 < 5; up2++) {
+                        if (!cur2 || !cur2.parentElement) break;
+                        cur2 = cur2.parentElement;
+                        var rect2 = cur2.getBoundingClientRect();
+                        if (rect2.width > window.innerWidth * 0.5 && rect2.height > 100) {
+                          memberOption = cur2;
+                          break;
+                        }
+                      }
+                    }
+                  }
+                }
+
+                // 매니저 옵션: 원 아이콘과 체크 표시 사이 간격 넓히기
+                if (managerOption) {
+                  var children = managerOption.querySelectorAll('div, svg, circle');
+                  for (var j = 0; j < children.length; j++) {
+                    var child = children[j];
+                    var rect = child.getBoundingClientRect();
+                    // 원형 아이콘 또는 체크 표시인 경우
+                    if (rect.width > 40 && rect.width < 150 && rect.height > 40 && rect.height < 150) {
+                      child.style.marginBottom = '20px';
+                    }
+                  }
+                }
+
+                // 멤버 옵션: 체크 표시와 텍스트 사이 간격 넓히기
+                if (memberOption) {
+                  var checkIcons = memberOption.querySelectorAll('svg, circle, path');
+                  for (var k = 0; k < checkIcons.length; k++) {
+                    checkIcons[k].style.marginBottom = '20px';
+                    // 체크 표시의 부모 요소도 간격 조정
+                    var parent = checkIcons[k].parentElement;
+                    if (parent) {
+                      parent.style.marginBottom = '20px';
+                    }
+                  }
+                }
+              } catch(e) {
+                console.log('ADJUST_OPTION_SPACING_ERR', e);
+              }
+            }
+
             // ==========================================
             // [3] 메인 로직
             // ==========================================
@@ -254,6 +405,9 @@ internal object MyPlaceAddFix {
                         content.classList.add('db-force-content-pos');
                     }
 
+                    // ✅ 매니저/멤버 옵션 간격 조정
+                    adjustOptionSpacing();
+
                     var btn = findNextBtn();
                     if (btn) {
                         if (!btn.classList.contains(MOVED_BTN_CLASS)) {
@@ -268,7 +422,9 @@ internal object MyPlaceAddFix {
 
                     var backBtn = findBackBtn();
                     if (backBtn) {
-                        backBtn.style.setProperty('transform', 'translateY(' + BACK_BTN_DOWN + 'px)', 'important');
+                        // ✅ 반응형 계산 - 뒤로가기 버튼을 아래로 내림
+                        var backDown = window.getResponsivePx ? window.getResponsivePx(BACK_BTN_DOWN_BASE, 'height') : BACK_BTN_DOWN_BASE;
+                        backBtn.style.setProperty('transform', 'translateY(' + backDown + 'px)', 'important');
                         backBtn.style.setProperty('z-index', '2147483647', 'important');
                     }
                 } else {
@@ -278,6 +434,20 @@ internal object MyPlaceAddFix {
                         ghostBtns[i].parentNode.removeChild(ghostBtns[i]);
                     }
                 }
+            }
+
+            // ✅ 화면 크기 변경 시에도 재계산되도록 리사이즈 이벤트 추가
+            if (!window.__dangbun_addplace_resize_handler__) {
+                window.__dangbun_addplace_resize_handler__ = true;
+                var resizeTimer;
+                window.addEventListener('resize', function() {
+                    clearTimeout(resizeTimer);
+                    resizeTimer = setTimeout(function() {
+                        if (isAddPlace()) {
+                            applyStyles(); // 스타일 재계산
+                        }
+                    }, 100);
+                });
             }
 
             setInterval(manageLayout, 100);
