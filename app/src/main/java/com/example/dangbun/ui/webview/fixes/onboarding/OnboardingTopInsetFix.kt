@@ -6,19 +6,24 @@ internal object OnboardingTopInsetFix {
     internal fun inject(
         view: WebView,
         topPx: Int = 0,
+        bottomPx: Int = 0,
     ) {
-        view.evaluateJavascript(provideJs(topPx), null)
+        view.evaluateJavascript(provideJs(topPx, bottomPx), null)
     }
 
-    private fun provideJs(topPx: Int): String {
+    private fun provideJs(topPx: Int, bottomPx: Int): String {
         return """
             (function() {
               try {
                 var TOP_PX = $topPx;
+                var BOTTOM_PX = $bottomPx;
 
                 var STYLE_ID = '__db_onboarding_top_inset_fix__';
                 var MASK_ID  = '__db_onb_bottom_mask__';
                 var DOT_PORTAL_ID = '__db_onb_dots_portal__';
+
+                // ✅ 로그인 전용 style id (온보딩과 분리)
+                var LOGIN_STYLE_ID = '__db_login_scrolllock_safearea__';
 
                 // ✅ 확대/위치 (현재 잘 맞춘 값 유지)
                 var IMG_SCALE   = 1.10;
@@ -29,18 +34,27 @@ internal object OnboardingTopInsetFix {
 
                 // ✅ 마스크/닷
                 var MASK_HEIGHT = 120;          // 하단 흰 영역
-                var DOT_GAP_FROM_BTN = 4;       // 버튼 위 여백(원하는 느낌이면 6~12 사이 미세조정)
-                var DOT_FORCE_MIN_BOTTOM = 90; // 너무 아래로 가려지는 것 방지용 최소 bottom
+                var DOT_GAP_FROM_BTN = 4;       // 버튼 위 여백
+                var DOT_FORCE_MIN_BOTTOM = 90;  // 너무 아래로 가려지는 것 방지용 최소 bottom
+
+                function pathLower() {
+                  return (location.pathname || '').toLowerCase();
+                }
 
                 function isOnboarding() {
-                  var path = (location.pathname || '').toLowerCase();
-                  return path.indexOf('onboarding') >= 0;
+                  return pathLower().indexOf('onboarding') >= 0;
+                }
+
+                // ✅ 로그인 라우트만 잡기 (필요하면 '/signin' 등 추가)
+                function isLogin() {
+                  var p = pathLower();
+                  return (p.indexOf('/login') >= 0);
                 }
 
                 // ============================================================
-                // 🧹 뒷정리 (온보딩 이탈 시 실행)
+                // 🧹 온보딩 뒷정리 (온보딩 이탈 시 실행)
                 // ============================================================
-                function cleanUp() {
+                function cleanUpOnboarding() {
                   try {
                     var style = document.getElementById(STYLE_ID);
                     if (style) style.remove();
@@ -56,22 +70,22 @@ internal object OnboardingTopInsetFix {
                       window.__db_onb_dots_observer__ = null;
                     }
 
-                    // root 스타일 원복
-                    var roots = document.querySelectorAll('html, body, #root, #__next, main');
-                    roots.forEach(function(el) {
-                      el.style.removeProperty('overflow'); el.style.removeProperty('overflow-x'); el.style.removeProperty('overflow-y');
-                      el.style.removeProperty('height'); el.style.removeProperty('width');
-                      el.style.removeProperty('position'); el.style.removeProperty('display');
-                      el.style.removeProperty('align-items'); el.style.removeProperty('justify-content');
-                      el.style.removeProperty('padding-top'); el.style.removeProperty('padding-bottom');
-                    });
+                    // ✅ root(html/body/#root 등)는 건드리지 않음
+                    // - 우리는 style tag(STYLE_ID / LOGIN_STYLE_ID)로만 제어하므로
+                    // - 여기서 root inline style을 지우면 SPA 화면이 깨질 수 있음
 
-                    // 고정했던 버튼 원상복구
+                    // ✅ 고정했던 버튼은 "원래 style"을 복구
                     var btns = document.querySelectorAll('[data-db-fixed]');
                     btns.forEach(function(btn) {
+                      try {
+                        var orig = btn.getAttribute('data-db-orig-style');
+                        if (orig !== null) btn.setAttribute('style', orig);
+                        else btn.removeAttribute('style');
+                      } catch(e) {}
+
+                      btn.removeAttribute('data-db-orig-style');
                       btn.removeAttribute('data-db-fixed');
                       btn.removeAttribute('data-db-listener');
-                      btn.style.cssText = '';
                     });
 
                     // 숨겼던 원본 dots 원복
@@ -83,6 +97,49 @@ internal object OnboardingTopInsetFix {
                       d.style.removeProperty('pointer-events');
                     });
                   } catch(e) {}
+                }
+
+                // ============================================================
+                // 🧹 로그인 뒷정리 (/login 이탈 시 실행)
+                // ============================================================
+                function cleanUpLogin() {
+                  try {
+                    var style = document.getElementById(LOGIN_STYLE_ID);
+                    if (style) style.remove();
+                  } catch(e) {}
+                }
+
+                // ============================================================
+                // ✅ 로그인 화면 전용 Fix: 스크롤 차단 + 하단 안전 여백
+                // ============================================================
+                function applyLoginFix() {
+                  if (!isLogin()) {
+                    cleanUpLogin();
+                    return;
+                  }
+
+                  var style = document.getElementById(LOGIN_STYLE_ID);
+                  if (!style) {
+                    style = document.createElement('style');
+                    style.id = LOGIN_STYLE_ID;
+                    document.head.appendChild(style);
+                  }
+
+                  // ✅ 핵심: 내비게이션바(하단바)만큼 body 아래 여백 확보
+                  // - bottomPx가 제대로 들어오면 기기별로 자동 대응
+                  // - 혹시 bottomPx가 0이면 최소 80px 확보(임시 fallback)
+                  var safeBottom = Math.max( (BOTTOM_PX || 0) + 16, 80 );
+
+                  // ✅ /login 전용 축소 비율(원하면 0.92 ~ 0.97 사이로 조절)
+                  var LOGIN_SCALE = 0.94;
+
+                  style.textContent =
+                    'html, body { margin:0 !important; padding:0 !important; width:100% !important; height:100% !important; overflow:hidden !important; overscroll-behavior:none !important; background:#FFFFFF !important; }' +
+                    'body { padding-bottom:' + safeBottom + 'px !important; }' +
+
+                    // ✅ [추가] 로그인 화면만 살짝 축소해서 하단 버튼이 시스템바 위로 오게
+                    '#root, #__next, main { width:100% !important; height:100% !important; }' +
+                    '#__next, #root { transform: scale(' + LOGIN_SCALE + ') !important; transform-origin: top center !important; }';
                 }
 
                 // ============================================================
@@ -132,6 +189,11 @@ internal object OnboardingTopInsetFix {
 
                   if (!targetBtn) return;
 
+                  // ✅ [추가] 원래 style 저장(한 번만)
+                  if (!targetBtn.getAttribute('data-db-orig-style')) {
+                    targetBtn.setAttribute('data-db-orig-style', targetBtn.getAttribute('style') || '');
+                  }
+
                   targetBtn.setAttribute('data-db-fixed', 'true');
 
                   targetBtn.style.setProperty('position', 'fixed', 'important');
@@ -152,13 +214,13 @@ internal object OnboardingTopInsetFix {
                   if (!targetBtn.getAttribute('data-db-listener')) {
                     targetBtn.setAttribute('data-db-listener', 'true');
                     targetBtn.addEventListener('click', function() {
-                      setTimeout(cleanUp, 300);
+                      setTimeout(cleanUpOnboarding, 300);
                     });
                   }
                 }
 
                 // ============================================================
-                // 🟣 dots 탐색 유틸 (점처럼 보이는 요소 판단)
+                // 🟣 dots 탐색/포탈 렌더 (당신 코드 그대로)
                 // ============================================================
                 function isDotLike(el) {
                   try {
@@ -171,8 +233,6 @@ internal object OnboardingTopInsetFix {
                     var cs = window.getComputedStyle(el);
                     var br = (cs.borderRadius || '').toString();
                     var round = (br.indexOf('50%') >= 0) || (parseFloat(br) >= 8) || (br.indexOf('999') >= 0);
-
-                    // 배경이 투명인 애는 점 가능성이 낮음(예외는 있으니 완전 배제는 X)
                     return round;
                   } catch(e) { return false; }
                 }
@@ -199,7 +259,6 @@ internal object OnboardingTopInsetFix {
                     var cx = (r.left + r.right) / 2;
                     var centerDist = Math.abs(cx - vw / 2);
 
-                    // 하단 근처 가산점
                     var desiredBottom = vh * 0.92;
                     var bottomDist = Math.abs(r.bottom - desiredBottom);
 
@@ -217,7 +276,6 @@ internal object OnboardingTopInsetFix {
                     var s = scoreDotsContainer(el);
                     if (s < 0) continue;
 
-                    // class/aria 힌트 가산점
                     try {
                       var cls = (el.className || '').toString().toLowerCase();
                       var aria = ((el.getAttribute && (el.getAttribute('aria-label') || '')) || '').toLowerCase();
@@ -232,9 +290,6 @@ internal object OnboardingTopInsetFix {
                   return best;
                 }
 
-                // ============================================================
-                // 🟣 dots 포탈 생성 (body 직속)
-                // ============================================================
                 function ensureDotsPortal() {
                   if (!isOnboarding()) return null;
 
@@ -252,7 +307,7 @@ internal object OnboardingTopInsetFix {
                   portal.style.setProperty('justify-content', 'center', 'important');
                   portal.style.setProperty('align-items', 'center', 'important');
                   portal.style.setProperty('pointer-events', 'none', 'important');
-                  portal.style.setProperty('z-index', '2147483646', 'important'); // mask(45) < dots(46) < btn(47)
+                  portal.style.setProperty('z-index', '2147483646', 'important');
                   return portal;
                 }
 
@@ -262,7 +317,6 @@ internal object OnboardingTopInsetFix {
                     var n = kids.length;
                     if (!n) return 0;
 
-                    // 1) aria-current / aria-selected / class active 우선
                     for (var i=0; i<n; i++) {
                       var k = kids[i];
                       var ac = (k.getAttribute && k.getAttribute('aria-current')) || '';
@@ -271,7 +325,6 @@ internal object OnboardingTopInsetFix {
                       if (ac === 'true' || as === 'true' || cls.indexOf('active') >= 0 || cls.indexOf('selected') >= 0) return i;
                     }
 
-                    // 2) style 차이(배경색/opacity)로 추정
                     var best = 0;
                     var bestScore = -1;
                     for (var j=0; j<n; j++) {
@@ -294,12 +347,10 @@ internal object OnboardingTopInsetFix {
                 function renderCustomDots(portal, count, activeIndex) {
                   if (!portal) return;
 
-                  // ✅ 완전 흰 배경 위에 떠 있는 느낌(웹처럼)
                   portal.style.setProperty('background', 'transparent', 'important');
 
-                  // 내부 렌더
                   var html = '<div style="display:flex;align-items:center;justify-content:center;gap:10px;">';
-                  for (var i=0; i<count; i++) {
+                  for (var i = 0; i < count; i++) {
                     var isActive = (i === activeIndex);
                     var size = isActive ? 10 : 8;
                     var color = isActive ? '#4A7BFF' : '#D0D0D0';
@@ -310,16 +361,12 @@ internal object OnboardingTopInsetFix {
                   portal.innerHTML = html;
                 }
 
-                // ============================================================
-                // 🟣 dots를 "레이어 밖"으로 빼서(포탈) 버튼 바로 위에 배치
-                // ============================================================
                 function fixIndicatorDots() {
                   if (!isOnboarding()) return;
 
                   var src = findBestDotsContainer();
                   if (!src) return;
 
-                  // 원본 dots는 숨김(레이어/클리핑 문제 회피)
                   src.setAttribute('data-db-dots-src', 'true');
                   src.style.setProperty('opacity', '0', 'important');
                   src.style.setProperty('visibility', 'hidden', 'important');
@@ -328,7 +375,6 @@ internal object OnboardingTopInsetFix {
                   var portal = ensureDotsPortal();
                   if (!portal) return;
 
-                  // 버튼 높이 기반으로 "버튼 바로 위" 계산
                   var btn = document.querySelector('[data-db-fixed="true"]');
                   var btnH = 56;
                   if (btn) {
@@ -338,13 +384,10 @@ internal object OnboardingTopInsetFix {
 
                   var computedBottom = (BTN_BOTTOM + btnH + DOT_GAP_FROM_BTN);
                   computedBottom = Math.max(DOT_FORCE_MIN_BOTTOM, computedBottom);
-
-                  // ✅ dots가 MASK 영역 밖으로 올라가면 “흰 배경 위” 느낌이 깨짐 → mask 안에 제한
                   computedBottom = Math.min(MASK_HEIGHT - 14, computedBottom);
 
                   portal.style.setProperty('bottom', computedBottom + 'px', 'important');
 
-                  // dots 개수/활성 인덱스 추정
                   var count = 5;
                   try {
                     var n = (src.children && src.children.length) ? src.children.length : 0;
@@ -354,7 +397,6 @@ internal object OnboardingTopInsetFix {
                   var activeIndex = getActiveIndexFromSource(src);
                   renderCustomDots(portal, count, activeIndex);
 
-                  // 상태 변하면 portal 업데이트
                   if (window.__db_onb_dots_observer__) {
                     try { window.__db_onb_dots_observer__.disconnect(); } catch(e) {}
                     window.__db_onb_dots_observer__ = null;
@@ -377,11 +419,11 @@ internal object OnboardingTopInsetFix {
                 }
 
                 // ============================================================
-                // 🎨 스타일 주입 (온보딩에서만)
+                // 🎨 온보딩 스타일 주입 (온보딩에서만)
                 // ============================================================
-                function applyStyle() {
+                function applyOnboardingStyle() {
                   if (!isOnboarding()) {
-                    cleanUp();
+                    cleanUpOnboarding();
                     return;
                   }
 
@@ -393,15 +435,10 @@ internal object OnboardingTopInsetFix {
                   }
 
                   style.textContent =
-                    // 스크롤 금지
                     'html, body { background:#FFFFFF !important; margin:0 !important; padding:0 !important; width:100% !important; height:100% !important; overflow:hidden !important; overscroll-behavior:none !important; }' +
-                    // 하단 마스크 높이 확보
                     'body { padding-top:' + TOP_PX + 'px !important; padding-bottom:' + MASK_HEIGHT + 'px !important; }' +
-                    // 중앙정렬 유지
                     '#root, #__next, main { display:flex !important; flex-direction:column !important; justify-content:center !important; align-items:center !important; width:100% !important; height:100% !important; overflow:hidden !important; }' +
                     'h1, h2, h3, h4, h5, h6, p, span, div[class*="text"] { text-align:center !important; }' +
-
-                    // ✅ 이미지: 확대 + 하단 살짝 잘림 + 가운데 정렬
                     'img:not(.icon):not([class*="icon"]) {' +
                       'width: calc(100vw * ' + IMG_SCALE + ') !important;' +
                       'max-width: none !important;' +
@@ -414,11 +451,7 @@ internal object OnboardingTopInsetFix {
                       'pointer-events:none !important;' +
                       'z-index:0 !important;' +
                     '}' +
-
-                    // 아이콘/SVG 보호
                     'svg { max-width:100% !important; width:auto !important; height:auto !important; margin:0 auto !important; z-index:1 !important; transform:none !important; pointer-events:none !important; }' +
-
-                    // 입력폼 보호
                     'input, form, label { text-align:left !important; opacity:1 !important; visibility:visible !important; display:block !important; pointer-events:auto !important; }';
 
                   ensureBottomMask();
@@ -426,10 +459,34 @@ internal object OnboardingTopInsetFix {
                   fixIndicatorDots();
                 }
 
-                if (!window.__db_onboarding_timer__) {
-                  window.__db_onboarding_timer__ = setInterval(applyStyle, 300);
+                // ============================================================
+                // ✅ 라우트별 실행 + 둘 다 아니면 타이머 종료(다른 화면 영향 0)
+                // ============================================================
+                function tick() {
+                  var onb = isOnboarding();
+                  var logn = isLogin();
+
+                  if (onb) applyOnboardingStyle();
+                  else cleanUpOnboarding();
+
+                  if (logn) applyLoginFix();
+                  else cleanUpLogin();
+
+                  // ✅ 둘 다 아니면 완전 종료
+                  if (!onb && !logn) {
+                    try {
+                      if (window.__db_onboarding_timer__) {
+                        clearInterval(window.__db_onboarding_timer__);
+                        window.__db_onboarding_timer__ = null;
+                      }
+                    } catch(e) {}
+                  }
                 }
-                applyStyle();
+
+                if (!window.__db_onboarding_timer__) {
+                  window.__db_onboarding_timer__ = setInterval(tick, 300);
+                }
+                tick();
 
               } catch(e) {}
             })();
