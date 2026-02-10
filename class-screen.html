@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Screen - 수업 Zone</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #FFFFFF;
+            color: #333;
+            overflow-x: hidden;
+        }
+
+        /* 상단 헤더 */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #FFFFFF;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 1000;
+            border-bottom: 1px solid #E5E5E5;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .hamburger-menu {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+        }
+
+        .hamburger-menu span {
+            width: 100%;
+            height: 2px;
+            background-color: #333;
+            transition: all 0.3s;
+        }
+
+        .hamburger-menu.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .hamburger-menu.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .hamburger-menu.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(7px, -6px);
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .close-button {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #333;
+        }
+
+        /* 사이드바 */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -300px;
+            width: 300px;
+            height: 100vh;
+            background: #FFFFFF;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+            z-index: 999;
+            transition: left 0.3s ease;
+            overflow-y: auto;
+            padding-top: 60px;
+        }
+
+        .sidebar.open {
+            left: 0;
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 998;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+
+        .sidebar-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .sidebar-content {
+            padding: 20px;
+        }
+
+        .sidebar-level {
+            margin-bottom: 24px;
+        }
+
+        .sidebar-level-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .sidebar-lesson-list {
+            list-style: none;
+            padding-left: 16px;
+        }
+
+        .sidebar-lesson-item {
+            padding: 8px 0;
+            cursor: pointer;
+            color: #666;
+            transition: color 0.2s;
+        }
+
+        .sidebar-lesson-item:hover {
+            color: #333;
+        }
+
+        .sidebar-lesson-item.active {
+            color: #6A84F4;
+            font-weight: 600;
+        }
+
+        /* 메인 콘텐츠 */
+        .main-content {
+            margin-top: 60px;
+            padding: 20px 16px 100px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .class-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .intro-section {
+            background: #F5F6F8;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            min-height: 60px;
+        }
+
+        .intro-text {
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* 경로 선택 */
+        .path-selection {
+            margin-bottom: 24px;
+        }
+
+        .path-selection-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .path-checkboxes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .path-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .path-checkbox input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .path-checkbox label {
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        /* 전체 진척도 */
+        .total-progress {
+            margin-bottom: 32px;
+        }
+
+        .total-progress-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .total-progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #E5E5E5;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .total-progress-fill {
+            height: 100%;
+            background: #6A84F4;
+            transition: width 0.3s;
+        }
+
+        /* 섹터 리스트 */
+        .sector-list {
+            margin-bottom: 32px;
+        }
+
+        .sector-item {
+            background: #FFFFFF;
+            border: 1px solid #E5E5E5;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sector-info {
+            flex: 1;
+        }
+
+        .sector-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .sector-progress-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .sector-progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #E5E5E5;
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .sector-progress-fill {
+            height: 100%;
+            background: #6A84F4;
+            transition: width 0.3s;
+        }
+
+        .sector-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .mark-complete-btn {
+            padding: 6px 12px;
+            background: #6A84F4;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .mark-complete-btn:hover {
+            background: #5A74E4;
+        }
+
+        .mark-complete-btn.completed {
+            background: #4CAF50;
+        }
+
+        /* Start Lesson 버튼 */
+        .start-lesson-section {
+            position: fixed;
+            bottom: 80px;
+            left: 0;
+            right: 0;
+            padding: 0 16px;
+            z-index: 100;
+        }
+
+        .start-lesson-btn {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 16px;
+            background: #6A84F4;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: block;
+        }
+
+        .start-lesson-btn:hover {
+            background: #5A74E4;
+        }
+
+        /* 하단 네비게이션 */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #FFFFFF;
+            border-top: 1px solid #E5E5E5;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            z-index: 1000;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            color: #666;
+            font-size: 12px;
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: #FFC107;
+        }
+
+        .nav-item-icon {
+            width: 24px;
+            height: 24px;
+            background: currentColor;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 상단 헤더 -->
+    <div class="header">
+        <div class="header-left">
+            <div class="hamburger-menu" id="hamburgerMenu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <div class="header-title">Class Screen</div>
+        </div>
+        <button class="close-button" id="closeButton">×</button>
+    </div>
+
+    <!-- 사이드바 오버레이 -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- 사이드바 -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content">
+            <div class="sidebar-level">
+                <div class="sidebar-level-title">1급</div>
+                <ul class="sidebar-lesson-list">
+                    <li class="sidebar-lesson-item" data-level="1" data-lesson="1">1과</li>
+                    <li class="sidebar-lesson-item" data-level="1" data-lesson="2">2과</li>
+                    <li class="sidebar-lesson-item" data-level="1" data-lesson="3">3과</li>
+                    <li class="sidebar-lesson-item" data-level="1" data-lesson="4">4과</li>
+                    <li class="sidebar-lesson-item active" data-level="1" data-lesson="5">5과</li>
+                </ul>
+            </div>
+            <div class="sidebar-level">
+                <div class="sidebar-level-title">2급</div>
+                <ul class="sidebar-lesson-list">
+                    <li class="sidebar-lesson-item" data-level="2" data-lesson="1">1과</li>
+                    <li class="sidebar-lesson-item" data-level="2" data-lesson="2">2과</li>
+                </ul>
+            </div>
+            <div class="sidebar-level">
+                <div class="sidebar-level-title">3급</div>
+                <ul class="sidebar-lesson-list">
+                    <li class="sidebar-lesson-item" data-level="3" data-lesson="1">1과</li>
+                </ul>
+            </div>
+            <div class="sidebar-level">
+                <div class="sidebar-level-title">4급</div>
+                <ul class="sidebar-lesson-list">
+                    <li class="sidebar-lesson-item" data-level="4" data-lesson="1">1과</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 메인 콘텐츠 -->
+    <div class="main-content">
+        <div class="class-title">Title: 1급 5과</div>
+
+        <!-- Intro Section -->
+        <div class="intro-section">
+            <div class="intro-text" id="introText">이 수업에서는 기본적인 어휘와 문법을 학습합니다.</div>
+        </div>
+
+        <!-- 경로 선택 -->
+        <div class="path-selection">
+            <div class="path-selection-title">Choose path:</div>
+            <div class="path-checkboxes">
+                <div class="path-checkbox">
+                    <input type="checkbox" id="pathVocab" checked>
+                    <label for="pathVocab">Vocab (Vocabulary)</label>
+                </div>
+                <div class="path-checkbox">
+                    <input type="checkbox" id="pathGrammar" checked>
+                    <label for="pathGrammar">Grammar</label>
+                </div>
+                <div class="path-checkbox">
+                    <input type="checkbox" id="pathReading" checked>
+                    <label for="pathReading">Reading</label>
+                </div>
+                <div class="path-checkbox">
+                    <input type="checkbox" id="pathListening" checked>
+                    <label for="pathListening">Listening</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 전체 진척도 -->
+        <div class="total-progress">
+            <div class="total-progress-label">Total completion progress bar</div>
+            <div class="total-progress-bar">
+                <div class="total-progress-fill" id="totalProgressFill" style="width: 35%"></div>
+            </div>
+        </div>
+
+        <!-- 섹터 리스트 -->
+        <div class="sector-list" id="sectorList">
+            <!-- 섹터들은 JavaScript로 동적 생성 -->
+        </div>
+    </div>
+
+    <!-- Start Lesson 버튼 -->
+    <div class="start-lesson-section">
+        <button class="start-lesson-btn" id="startLessonBtn">Start Lesson</button>
+    </div>
+
+    <!-- 하단 네비게이션 -->
+    <div class="bottom-nav">
+        <div class="nav-item active">
+            <div class="nav-item-icon"></div>
+            <span>Class Zone</span>
+        </div>
+        <div class="nav-item">
+            <div class="nav-item-icon"></div>
+            <span>Practice Zone</span>
+        </div>
+        <div class="nav-item">
+            <div class="nav-item-icon"></div>
+            <span>Personal Notebook</span>
+        </div>
+        <div class="nav-item">
+            <div class="nav-item-icon"></div>
+            <span>Profile & Settings</span>
+        </div>
+    </div>
+
+    <script>
+        // 섹터 데이터 구조
+        const sectors = [
+            { id: 'vocab', name: 'Vocabulary', progress: 45, timeSpent: 12, completed: false },
+            { id: 'grammar1', name: 'Grammar 1', progress: 30, timeSpent: 8, completed: false },
+            { id: 'grammar2', name: 'Grammar 2', progress: 20, timeSpent: 5, completed: false },
+            { id: 'grammar3', name: 'Grammar 3', progress: 0, timeSpent: 0, completed: false },
+            { id: 'reading', name: 'Reading', progress: 60, timeSpent: 15, completed: false },
+            { id: 'listening', name: 'Listening', progress: 25, timeSpent: 6, completed: false }
+        ];
+
+        // 타이머 데이터 (각 섹터별 머문 시간 - 초 단위)
+        const timers = {};
+        sectors.forEach(sector => {
+            timers[sector.id] = sector.timeSpent * 60; // 분을 초로 변환
+        });
+
+        // 현재 활성화된 섹터 (사용자가 보고 있는 섹터)
+        let activeSector = null;
+        let activeTimerInterval = null;
+
+        // 햄버거 메뉴 토글
+        const hamburgerMenu = document.getElementById('hamburgerMenu');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+        hamburgerMenu.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+            sidebarOverlay.classList.toggle('open');
+            hamburgerMenu.classList.toggle('active');
+        });
+
+        sidebarOverlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            sidebarOverlay.classList.remove('open');
+            hamburgerMenu.classList.remove('active');
+        });
+
+        // 사이드바 수업 선택
+        document.querySelectorAll('.sidebar-lesson-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.sidebar-lesson-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+                
+                const level = this.dataset.level;
+                const lesson = this.dataset.lesson;
+                loadLesson(level, lesson);
+                
+                // 사이드바 닫기
+                sidebar.classList.remove('open');
+                sidebarOverlay.classList.remove('open');
+                hamburgerMenu.classList.remove('active');
+            });
+        });
+
+        // 닫기 버튼
+        document.getElementById('closeButton').addEventListener('click', () => {
+            if (confirm('수업을 종료하시겠습니까?')) {
+                window.close();
+            }
+        });
+
+        // 섹터 리스트 렌더링
+        function renderSectors() {
+            const sectorList = document.getElementById('sectorList');
+            sectorList.innerHTML = '';
+
+            sectors.forEach(sector => {
+                const sectorItem = document.createElement('div');
+                sectorItem.className = 'sector-item';
+                sectorItem.dataset.sectorId = sector.id;
+
+                const minutes = Math.floor(timers[sector.id] / 60);
+                const seconds = timers[sector.id] % 60;
+                const timeStr = `${minutes}분 ${seconds}초`;
+
+                sectorItem.innerHTML = `
+                    <div class="sector-info">
+                        <div class="sector-name">${sector.name}</div>
+                        <div class="sector-progress-info">
+                            <div>진척도: ${sector.progress}%</div>
+                            <div>머문 시간: <span class="timer-display" data-sector="${sector.id}">${timeStr}</span></div>
+                        </div>
+                        <div class="sector-progress-bar">
+                            <div class="sector-progress-fill" style="width: ${sector.progress}%"></div>
+                        </div>
+                    </div>
+                    <div class="sector-actions">
+                        <button class="mark-complete-btn ${sector.completed ? 'completed' : ''}" 
+                                data-sector="${sector.id}">
+                            ${sector.completed ? '완료됨' : 'Mark Complete'}
+                        </button>
+                    </div>
+                `;
+
+                sectorList.appendChild(sectorItem);
+            });
+
+            // Mark Complete 버튼 이벤트
+            document.querySelectorAll('.mark-complete-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const sectorId = this.dataset.sector;
+                    toggleComplete(sectorId);
+                });
+            });
+
+            // 섹터 클릭 시 타이머 활성화 (시각적 피드백)
+            document.querySelectorAll('.sector-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('mark-complete-btn')) return;
+                    const sectorId = this.dataset.sectorId;
+                    setActiveSector(sectorId);
+                });
+            });
+        }
+
+        // 완료 토글
+        function toggleComplete(sectorId) {
+            const sector = sectors.find(s => s.id === sectorId);
+            if (!sector) return;
+
+            sector.completed = !sector.completed;
+            if (sector.completed) {
+                sector.progress = 100;
+            }
+
+            renderSectors();
+            updateTotalProgress();
+        }
+
+        // 활성 섹터 설정 (타이머 시작)
+        function setActiveSector(sectorId) {
+            // 이전 타이머 정지
+            if (activeTimerInterval) {
+                clearInterval(activeTimerInterval);
+            }
+
+            activeSector = sectorId;
+
+            // 새 타이머 시작
+            activeTimerInterval = setInterval(() => {
+                if (timers[sectorId] !== undefined) {
+                    timers[sectorId]++;
+                    updateTimerDisplay(sectorId);
+                }
+            }, 1000);
+        }
+
+        // 타이머 표시 업데이트
+        function updateTimerDisplay(sectorId) {
+            const timerDisplay = document.querySelector(`.timer-display[data-sector="${sectorId}"]`);
+            if (timerDisplay) {
+                const minutes = Math.floor(timers[sectorId] / 60);
+                const seconds = timers[sectorId] % 60;
+                timerDisplay.textContent = `${minutes}분 ${seconds}초`;
+            }
+        }
+
+        // 전체 진척도 업데이트
+        function updateTotalProgress() {
+            const totalProgress = sectors.reduce((sum, s) => sum + s.progress, 0) / sectors.length;
+            document.getElementById('totalProgressFill').style.width = totalProgress + '%';
+        }
+
+        // 수업 로드
+        function loadLesson(level, lesson) {
+            document.querySelector('.class-title').textContent = `Title: ${level}급 ${lesson}과`;
+            
+            // 여기서 실제로는 서버에서 데이터를 가져와야 함
+            // 예시로 초기화만 수행
+            sectors.forEach(sector => {
+                sector.progress = Math.floor(Math.random() * 50);
+                sector.completed = false;
+                timers[sector.id] = Math.floor(Math.random() * 600);
+            });
+
+            renderSectors();
+            updateTotalProgress();
+        }
+
+        // Start Lesson 버튼
+        document.getElementById('startLessonBtn').addEventListener('click', () => {
+            // 선택된 경로 확인
+            const selectedPaths = [];
+            if (document.getElementById('pathVocab').checked) selectedPaths.push('vocab');
+            if (document.getElementById('pathGrammar').checked) selectedPaths.push('grammar');
+            if (document.getElementById('pathReading').checked) selectedPaths.push('reading');
+            if (document.getElementById('pathListening').checked) selectedPaths.push('listening');
+
+            if (selectedPaths.length === 0) {
+                alert('최소 하나의 경로를 선택해주세요.');
+                return;
+            }
+
+            // 완료되지 않은 섹터 중 첫 번째로 이동
+            const incompleteSectors = sectors.filter(s => !s.completed && selectedPaths.some(p => s.id.includes(p)));
+            if (incompleteSectors.length > 0) {
+                alert(`${incompleteSectors[0].name} 섹터로 이동합니다.`);
+                // 실제로는 여기서 해당 섹터의 학습 페이지로 이동
+                setActiveSector(incompleteSectors[0].id);
+            } else {
+                alert('모든 섹터를 완료했습니다!');
+            }
+        });
+
+        // 페이지 로드 시 초기화
+        renderSectors();
+        updateTotalProgress();
+
+        // 페이지 언로드 시 타이머 정리
+        window.addEventListener('beforeunload', () => {
+            if (activeTimerInterval) {
+                clearInterval(activeTimerInterval);
+            }
+            // 여기서 서버에 타이머 데이터 저장
+            console.log('타이머 데이터 저장:', timers);
+        });
+    </script>
+</body>
+</html>

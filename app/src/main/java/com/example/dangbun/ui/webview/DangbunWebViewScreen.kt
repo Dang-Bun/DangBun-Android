@@ -3,8 +3,10 @@ package com.example.dangbun.ui.webview
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.net.Uri
+import android.net.http.SslError
 import android.util.Log
 import android.webkit.ConsoleMessage
+import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -75,8 +77,114 @@ fun DangbunWebViewScreen(
     }
 
     /**
+     * ✅ DOM 상태 스냅샷 로깅
+     */
+    fun logDomSnapshot(view: WebView, label: String) {
+        val js =
+            """
+            (function() {
+              try {
+                var t = document.body ? (document.body.innerText || '') : '';
+                var hasDangbun = (t.indexOf('당번') >= 0);
+                var root = document.getElementById('__next') || document.getElementById('root');
+                var rootChildren = root ? root.children.length : -1;
+
+                return JSON.stringify({
+                  label: "$label",
+                  href: location.href,
+                  path: location.pathname,
+                  readyState: document.readyState,
+                  bodyTextLen: t.length,
+                  hasDangbunText: hasDangbun,
+                  imgCount: (document.images ? document.images.length : 0),
+                  rootChildren: rootChildren
+                });
+              } catch(e) {
+                return JSON.stringify({ label: "$label", error: String(e) });
+              }
+            })();
+            """.trimIndent()
+
+        view.evaluateJavascript(js) { result ->
+            Log.d(TAG, "DOM_SNAPSHOT: $result")
+        }
+    }
+
+    /**
+     * ✅ 루트(/) 스플래시에서만: "중앙정렬 컨테이너"를 찾아 아래로 내림
+     * - 다른 화면 영향 없음 (styleId가 cleanup에 의해 제거됨)
+     * - JS 문법 깨짐 방지: 템플릿 리터럴/중괄호 혼용 없이 순수 문자열로 작성
+     */
+    fun injectSplashOffsetFix(view: WebView, shiftPx: Int) {
+        val safeShift = shiftPx.coerceIn(0, 400)
+
+        val js =
+            """
+            (function() {
+              try {
+                var p = (location.pathname || '');
+                if (!(p === '/' || p === '')) return;
+
+                var styleId = '__db_splash_offset_fix__';
+                var style = document.getElementById(styleId);
+                if (!style) {
+                  style = document.createElement('style');
+                  style.id = styleId;
+                  document.head.appendChild(style);
+                }
+
+                // ✅ 1) 기본적으로 root 바로 아래를 아래로 내림
+                // ✅ 2) "당번" 텍스트를 포함한 가장 가까운 상위 컨테이너를 추가로 아래로 내림
+                var css = '';
+                css += 'html, body { height: 100% !important; }';
+                css += 'body { margin: 0 !important; padding: 0 !important; }';
+                css += '#__next, #root { min-height: 100vh !important; }';
+                css += '#__next > *, #root > * { transform: translateY(' + $safeShift + 'px) !important; }';
+
+                // 텍스트 기반 타겟팅 (DOM 구조가 바뀌어도 최대한 따라가게)
+                var target = null;
+                try {
+                  var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+                  while (walker.nextNode()) {
+                    var node = walker.currentNode;
+                    if (node && node.nodeValue && node.nodeValue.indexOf('당번') >= 0) {
+                      target = node.parentElement;
+                      break;
+                    }
+                  }
+                } catch(e) {}
+
+                if (target) {
+                  // 너무 작은 span 같은 거면 상위로 끌어올림
+                  var el = target;
+                  for (var i = 0; i < 6; i++) {
+                    if (!el || !el.parentElement) break;
+                    var r = el.getBoundingClientRect();
+                    // 화면 상단에 너무 붙어있으면 더 큰 컨테이너로
+                    if (r && r.height < 120) el = el.parentElement;
+                  }
+                  css += ' ' + (el ? ('#' + el.id) : '') + ' ';
+                  // id가 없으면 class/inline 타겟 대신 직접 스타일 부여
+                  try {
+                    el.style.setProperty('transform', 'translateY(' + $safeShift + 'px)', 'important');
+                    el.style.setProperty('will-change', 'transform', 'important');
+                  } catch(e) {}
+                }
+
+                style.textContent = css;
+
+                console.log('DB_SPLASH_OFFSET_APPLIED', $safeShift);
+              } catch(e) {
+                console.log('DB_SPLASH_OFFSET_ERROR', String(e));
+              }
+            })();
+            """.trimIndent()
+
+        view.evaluateJavascript(js, null)
+    }
+
+    /**
      * ✅ (기존) 회색 상단띠/배경 강제 주입
-     * - myplace / placemake 에서만 사용
      */
     fun injectGrayTopBandKiller(view: WebView) {
         val js =
@@ -114,9 +222,7 @@ fun DangbunWebViewScreen(
     }
 
     /**
-     * ✅ (수정) addPlace 진입 시:
-     * 1) 이전에 깔린 스타일 제거
-     * 2) 회색 배경 강제 적용 (흰색/회색 혼재 문제 해결)
+     * ✅ addPlace 진입 시 회색 배경 강제
      */
     fun injectAddPlaceGrayBackground(view: WebView) {
         val js =
@@ -165,7 +271,18 @@ fun DangbunWebViewScreen(
     ) {
         val path = pathRaw.lowercase()
 
-        // ✅ 화면 전환 시 이전 화면의 스타일 제거 (청소)
+        // ✅ 루트(/)는 스플래시: 청소 JS 금지 + 루트에서만 아래로 내리는 Fix 주입
+        if (path.isBlank() || path == "/") {
+            containerBg = Color(0xFF6A84F4)
+            Log.d(TAG, "ROOT_ROUTE: skip cleanup js, path=$pathRaw")
+
+            // ✅ 여기서만 스플래시 위치 보정 (다른 화면 영향 없음)
+            injectSplashOffsetFix(view, shiftPx = 320)
+
+            return
+        }
+
+        // ✅ (루트가 아닐 때만) 이전 화면 스타일/클래스 제거 (청소)
         view.evaluateJavascript(
             """
             (function() {
@@ -177,7 +294,8 @@ fun DangbunWebViewScreen(
                   '__db_placemake3_top_inset_fix__',
                   '__db_addplace_gray_bg__',
                   '__db_gray_topband_killer__',
-                  '__db_onboarding_top_inset_fix__'
+                  '__db_onboarding_top_inset_fix__',
+                  '__db_splash_offset_fix__' // ✅ 루트 스플래시 보정 스타일 제거
                 ];
                 for (var s = 0; s < styleIds.length; s++) {
                   var styleEl = document.getElementById(styleIds[s]);
@@ -185,7 +303,7 @@ fun DangbunWebViewScreen(
                     styleEl.parentNode.removeChild(styleEl);
                   }
                 }
-                
+
                 // 클래스 제거
                 var classesToRemove = [
                   'db-back-button-fixed',
@@ -202,7 +320,7 @@ fun DangbunWebViewScreen(
                     } catch(e) {}
                   }
                 }
-                
+
                 // 음수 margin 제거
                 var mainElements = document.querySelectorAll('main, #root, #__next, body, html');
                 for (var j = 0; j < mainElements.length; j++) {
@@ -213,7 +331,7 @@ fun DangbunWebViewScreen(
                     el.style.setProperty('margin-top', '0', 'important');
                   }
                 }
-                
+
                 // 스타일 초기화
                 var bodyElements = document.querySelectorAll('html, body, #root, #__next, main');
                 for (var k = 0; k < bodyElements.length; k++) {
@@ -228,13 +346,12 @@ fun DangbunWebViewScreen(
                     elem.style.setProperty('overflow', 'visible', 'important');
                   }
                 }
-                
+
                 // 고정 버튼 초기화
                 var fixedButtons = document.querySelectorAll('button[style*="position: fixed"]');
                 for (var b = 0; b < fixedButtons.length; b++) {
                   var btn = fixedButtons[b];
                   var currentPath = (location.pathname || '').toLowerCase();
-                  // 온보딩이 아니면 초기화
                   if (currentPath.indexOf('onboarding') >= 0) {
                      btn.style.setProperty('position', 'relative', 'important');
                      btn.style.setProperty('bottom', 'auto', 'important');
@@ -246,21 +363,20 @@ fun DangbunWebViewScreen(
             null
         )
 
-        // ✅ 배경색 로직 수정 (placemake1은 흰색으로!)
+        // ✅ 배경색
         containerBg =
             when {
                 path.contains("myplace") -> Color(0xFFF5F6F8)
-                path.contains("placemake1") -> Color.White // 🔥 [수정] 흰색
-                path.contains("placemake") -> Color(0xFFF5F6F8) // 나머지 placemake2,3은 회색
+                path.contains("placemake1") -> Color.White
+                path.contains("placemake") -> Color(0xFFF5F6F8)
                 path.contains("addplace") -> Color(0xFFF5F6F8)
                 else -> Color.White
             }
 
-        // ✅ 회색 배경 강제 주입 로직
+        // ✅ 회색 배경 강제 주입
         if (path.contains("addplace")) {
             injectAddPlaceGrayBackground(view)
         } else if ((path.contains("placemake") && !path.contains("placemake1")) || path.contains("myplace")) {
-            // placemake1은 흰색이므로 여기서 제외, 나머지는 회색 강제
             injectGrayTopBandKiller(view)
         }
 
@@ -276,13 +392,9 @@ fun DangbunWebViewScreen(
 
         // ✅ placemake 라우터
         if (path.contains("placemake1")) {
-            // 🔥 [수정] inject 대신 debug를 호출합니다.
-            // PlaceMake1TopInsetFix.inject(view, contentStartTop = 80)
             PlaceMake1TopInsetFix.debug(view)
         }
         if (path.contains("placemake2")) {
-            // raisePx 대신 contentStartTop을 사용하세요.
-            // 140은 상단 여백(px)입니다. 화면에 맞게 조절 가능합니다.
             PlaceMake2TopInsetFix.inject(view, contentStartTop = 60)
         }
         if (path.contains("placemake3")) {
@@ -338,7 +450,9 @@ fun DangbunWebViewScreen(
                             if (msg.startsWith("SPA_NAV_DETECTED")) {
                                 val detectedPath = msg.removePrefix("SPA_NAV_DETECTED").trim()
                                 this@apply.post {
+                                    Log.d(TAG, "WV_SPA_NAV: path=$detectedPath")
                                     applyRouteFix(detectedPath, this@apply)
+                                    logDomSnapshot(this@apply, "SPA_NAV:$detectedPath")
                                 }
                             }
                             return super.onConsoleMessage(consoleMessage)
@@ -354,6 +468,54 @@ fun DangbunWebViewScreen(
                             return handleUrl(context, request.url.toString(), view)
                         }
 
+                        override fun onPageStarted(
+                            view: WebView,
+                            url: String,
+                            favicon: android.graphics.Bitmap?
+                        ) {
+                            super.onPageStarted(view, url, favicon)
+                            Log.d(TAG, "WV_PAGE_STARTED: $url")
+                        }
+
+                        override fun onPageCommitVisible(view: WebView, url: String) {
+                            super.onPageCommitVisible(view, url)
+                            Log.d(TAG, "WV_PAGE_COMMIT_VISIBLE: $url")
+                            logDomSnapshot(view, "COMMIT_VISIBLE")
+                        }
+
+                        override fun onReceivedHttpError(
+                            view: WebView,
+                            request: WebResourceRequest,
+                            errorResponse: android.webkit.WebResourceResponse
+                        ) {
+                            super.onReceivedHttpError(view, request, errorResponse)
+                            Log.e(
+                                TAG,
+                                "WV_HTTP_ERROR: url=${request.url} status=${errorResponse.statusCode} reason=${errorResponse.reasonPhrase}"
+                            )
+                        }
+
+                        override fun onReceivedError(
+                            view: WebView,
+                            request: WebResourceRequest,
+                            error: android.webkit.WebResourceError
+                        ) {
+                            super.onReceivedError(view, request, error)
+                            Log.e(
+                                TAG,
+                                "WV_WEB_ERROR: url=${request.url} code=${error.errorCode} desc=${error.description}"
+                            )
+                        }
+
+                        override fun onReceivedSslError(
+                            view: WebView,
+                            handler: SslErrorHandler,
+                            error: SslError
+                        ) {
+                            super.onReceivedSslError(view, handler, error)
+                            Log.e(TAG, "WV_SSL_ERROR: primaryError=${error.primaryError} url=${error.url}")
+                        }
+
                         override fun onPageFinished(
                             view: WebView,
                             url: String,
@@ -362,14 +524,24 @@ fun DangbunWebViewScreen(
                             view.post { view.scrollTo(0, 0) }
 
                             val path = runCatching { Uri.parse(url).path.orEmpty() }.getOrDefault("")
+                            val isRoot = path.isBlank() || path == "/"
 
-                            // ✅ 공통 픽스
-                            injectCommonFixes(view)
+                            // ✅ 스플래시 픽스는 항상 주입 (JS 내부에서 splash 여부 판단)
                             injectSplashFix(view)
-                            if (url.contains("kakao.com")) injectKakaoLtrFix(view)
 
-                            // ✅ 페이지 로드 시 라우터 픽스 적용
+                            // ✅ 루트(/)에서는 CommonFix 차단
+                            if (!isRoot) {
+                                injectCommonFixes(view)
+                                if (url.contains("kakao.com")) injectKakaoLtrFix(view)
+                            }
+
+                            // ✅ 라우터 픽스 적용
                             applyRouteFix(path, view)
+
+                            Log.d(TAG, "WV_PAGE_FINISHED: url=$url path=$path")
+                            logDomSnapshot(view, "FINISHED")
+                            view.postDelayed({ logDomSnapshot(view, "FINISHED+300ms") }, 300)
+                            view.postDelayed({ logDomSnapshot(view, "FINISHED+1500ms") }, 1500)
 
                             // ✅ SPA 네비게이션 감지 설치
                             view.evaluateJavascript(

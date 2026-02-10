@@ -2,22 +2,18 @@ package com.example.dangbun.ui.webview.fixes.splash
 
 import android.webkit.WebView
 import com.example.dangbun.ui.webview.SPLASH_BG_HEX
-import com.example.dangbun.ui.webview.fixes.common.ResponsiveUtils
 
 internal object SplashFix {
     internal fun injectSplashFix(view: WebView) {
         val js =
             """
             (function() {
+              // ✅ JS 파싱 에러 나면 try/catch로도 못 잡히니까, 구조 단순하게 유지
               try {
-                // ✅ 반응형 유틸리티 로드
-                if (!window.__dangbun_responsive_utils__) {
-                  ${ResponsiveUtils.getResponsiveJs()}
-                }
-
                 var BG = '${SPLASH_BG_HEX}';
+                var STYLE_ID = '__db_splash_fix_css__';
 
-                function ensureViewportScale() {
+                function setViewport(scale) {
                   try {
                     var meta = document.querySelector('meta[name="viewport"]');
                     if (!meta) {
@@ -25,9 +21,10 @@ internal object SplashFix {
                       meta.name = 'viewport';
                       document.head.appendChild(meta);
                     }
-                    // ✅ 화면 크기에 따라 동적으로 scale 계산
-                    var scale = window.getResponsiveScale ? window.getResponsiveScale() : 0.8;
-                    meta.content = 'width=device-width, initial-scale=' + scale + ', maximum-scale=1.0, user-scalable=no';
+                    meta.setAttribute(
+                      'content',
+                      'width=device-width, initial-scale=' + scale + ', maximum-scale=' + scale + ', user-scalable=no'
+                    );
                   } catch(e) {}
                 }
 
@@ -36,109 +33,103 @@ internal object SplashFix {
                   return (p === '/' || p === '' || p === '/index.html');
                 }
 
+                function hasNextButton() {
+                  var btns = document.querySelectorAll('button,a,[role="button"]');
+                  for (var i = 0; i < btns.length; i++) {
+                    var t = (btns[i].innerText || '').trim();
+                    if (t === '다음') return true;
+                  }
+                  return false;
+                }
+
                 function isSplash() {
                   if (!isRootPath()) return false;
+
+                  // 텍스트에 '당번'이 있고, '다음' 버튼이 없으면 스플래시로 간주
                   var txt = (document.body && document.body.innerText) ? document.body.innerText : '';
                   if (txt.indexOf('당번') < 0) return false;
+                  if (hasNextButton()) return false;
 
-                  // '다음' 버튼이 있으면 스플래시가 아님(온보딩)
-                  var btns = document.querySelectorAll('button,a,[role="button"]');
-                  for (var i=0; i<btns.length; i++) {
-                    var t = (btns[i].innerText || '').trim();
-                    if (t === '다음') return false;
-                  }
                   return true;
                 }
 
-                function applySplashCenter() {
-                  if (window.__dangbun_splash_center_applied__) return;
-                  window.__dangbun_splash_center_applied__ = true;
-
-                  ensureViewportScale();
-
-                  var h = window.innerHeight || 0;
-                  var H = h > 0 ? (h + 'px') : '100vh';
-
-                  document.documentElement.style.background = BG;
-                  document.body.style.background = BG;
-
-                  document.documentElement.style.height = H;
-                  document.body.style.height = H;
-                  document.body.style.minHeight = H;
-
-                  document.body.style.margin = '0';
-                  document.body.style.overflow = 'hidden';
-
-                  var root = document.querySelector('#root') || document.querySelector('#__next') || document.querySelector('#app');
-                  var host = root || document.body;
-
-                  host.style.backgroundColor = BG;
-                  host.style.height = H;
-                  host.style.minHeight = H;
-
-                  host.style.display = 'flex';
-                  host.style.flexDirection = 'column';
-                  host.style.justifyContent = 'center';
-                  host.style.alignItems = 'center';
-
-                  host.style.width = '100%';
-                  host.style.maxWidth = '100vw';
-                  host.style.padding = '0';
-                  host.style.boxSizing = 'border-box';
-
-                  var child = host.firstElementChild;
-                  if (child) {
-                    child.style.margin = 'auto';
+                function ensureStyle() {
+                  var style = document.getElementById(STYLE_ID);
+                  if (!style) {
+                    style = document.createElement('style');
+                    style.id = STYLE_ID;
+                    document.head.appendChild(style);
                   }
-                  console.log('WV_SPLASH_CENTER_APPLIED');
+
+                  // ✅ html에 data attribute 달아두고, CSS는 그 때만 강제 적용 (reset이 안전해짐)
+                  style.textContent = `
+                    html[data-db-splash="1"], html[data-db-splash="1"] body {
+                      margin: 0 !important;
+                      padding: 0 !important;
+                      width: 100% !important;
+                      height: 100% !important;
+                      background: ${'$'}{BG} !important;
+                      overflow: hidden !important;
+                    }
+
+                    html[data-db-splash="1"] #root,
+                    html[data-db-splash="1"] #__next,
+                    html[data-db-splash="1"] #app {
+                      position: fixed !important;
+                      inset: 0 !important;
+                      width: 100% !important;
+                      height: 100% !important;
+                      background: ${'$'}{BG} !important;
+
+                      /* ✅ 중앙 정렬 */
+                      display: flex !important;
+                      flex-direction: column !important;
+                      justify-content: center !important;
+                      align-items: center !important;
+
+                      /* ✅ 다른 Fix에서 남긴 topShift/transform 제거 */
+                      transform: none !important;
+                      margin-top: 0 !important;
+                      top: 0 !important;
+
+                      box-sizing: border-box !important;
+                      padding-top: env(safe-area-inset-top) !important;
+                      padding-bottom: env(safe-area-inset-bottom) !important;
+                      padding-left: env(safe-area-inset-left) !important;
+                      padding-right: env(safe-area-inset-right) !important;
+                    }
+                  `;
                 }
 
-                function resetSplashCenter() {
-                  // ✅ 온보딩 화면에서는 상단 여백 최소화 (건너뛰기 버튼이 보이도록)
-                  try {
-                    var root2 = document.querySelector('#root') || document.querySelector('#__next') || document.querySelector('#app');
-                    var main2 = document.querySelector('main');
-                    var host2 = main2 || root2;
+                function applySplash() {
+                  if (window.__db_splash_applied__) return;
+                  window.__db_splash_applied__ = true;
 
-                    if (host2) {
-                      // ✅ 상단 여백을 최소화 (기존 60px -> 0px)
-                      host2.style.paddingTop = '15px';
-                      host2.style.boxSizing = 'border-box';
-                    }
-                  } catch(e) {}
+                  document.documentElement.setAttribute('data-db-splash', '1');
+                  ensureStyle();
 
-                  if (!window.__dangbun_splash_center_applied__) return;
-                  window.__dangbun_splash_center_applied__ = false;
+                  // ✅ 스플래시는 "이중 스케일" 방지: 1.0 고정
+                  setViewport(1.0);
 
-                  document.documentElement.style.background = '';
-                  document.body.style.background = '';
+                  console.log('[SPLASH_FIX] applied');
+                }
 
-                  var root = document.querySelector('#root') || document.querySelector('#__next') || document.querySelector('#app');
-                  var host = root || document.body;
+                function resetSplash() {
+                  if (!window.__db_splash_applied__) return;
+                  window.__db_splash_applied__ = false;
 
-                  host.style.height = '';
-                  host.style.display = '';
-                  host.style.flexDirection = '';
-                  host.style.justifyContent = '';
-                  host.style.alignItems = '';
-                  host.style.width = '';
-                  host.style.maxWidth = '';
-                  host.style.boxSizing = '';
-                  host.style.backgroundColor = '';
+                  document.documentElement.removeAttribute('data-db-splash');
 
-                  document.body.style.backgroundColor = '';
-                  document.documentElement.style.backgroundColor = '';
+                  // ✅ 다른 화면은 기존 정책대로(너 프로젝트 기준 0.8이 기본이면 0.8로 복귀)
+                  // 필요 시 여기 값을 너가 쓰는 기본 스케일로 바꿔도 됨.
+                  setViewport(0.8);
 
-                  document.body.style.margin = '';
-                  document.documentElement.style.height = '';
-                  document.body.style.height = '';
-                  document.body.style.overflow = '';
+                  console.log('[SPLASH_FIX] reset');
                 }
 
                 function check() {
-                  ensureViewportScale();
-                  if (isSplash()) applySplashCenter();
-                  else resetSplashCenter();
+                  if (isSplash()) applySplash();
+                  else resetSplash();
                 }
 
                 check();
@@ -147,8 +138,8 @@ internal object SplashFix {
                 setTimeout(check, 300);
                 setTimeout(check, 700);
 
-                if (!window.__dangbun_viewport_hooked__) {
-                  window.__dangbun_viewport_hooked__ = true;
+                if (!window.__db_splash_hooked__) {
+                  window.__db_splash_hooked__ = true;
 
                   var _ps = history.pushState;
                   history.pushState = function() {
@@ -165,12 +156,14 @@ internal object SplashFix {
                   };
 
                   window.addEventListener('popstate', function(){ setTimeout(check, 0); });
+                  window.addEventListener('resize', function(){ setTimeout(check, 0); });
 
                   var mo = new MutationObserver(function(){ check(); });
                   mo.observe(document.documentElement, { childList:true, subtree:true });
                 }
-
-              } catch(e) {}
+              } catch(e) {
+                console.log('[SPLASH_FIX] error', e);
+              }
             })();
             """.trimIndent()
 
