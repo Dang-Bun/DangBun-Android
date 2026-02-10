@@ -22,8 +22,9 @@ internal object MyPlaceAddFix {
 
                 var GRAY_BG = '#F5F6F8';
                 // ✅ 기준 값들을 화면 크기에 맞게 동적 계산
-                // ✅ 상단 여백 최소화: 콘텐츠를 더 많이 위로 올림
-                var CONTENT_START_TOP_BASE = -180;  // -150 -> -180 (더 위로 올림)
+                // ✅ 상단 여백 최소화: 뒤로가기 버튼 바로 아래 질문 텍스트 배치
+                // ✅ 질문 텍스트를 더 아래로 내림
+                var CONTENT_START_TOP_BASE = -200;  // -280 -> -200 (질문 텍스트를 더 아래로 내림)
                 var NEXT_BTN_BOTTOM_BASE = 80;  // 60 -> 80 (다음 버튼을 위로 올림)
                 var BACK_BTN_DOWN_BASE = 40;  // 20 -> 40 (뒤로가기 버튼을 아래로 내림, translateY는 양수면 아래로)
                 
@@ -167,9 +168,18 @@ internal object MyPlaceAddFix {
                             -webkit-overflow-scrolling: auto !important;
                             touch-action: none !important;
                         }
+                        
+                        /* ✅ 모든 컨테이너의 상단 여백 강제 제거 */
+                        body > *, #root > *, #__next > *, main > *,
+                        body > * > *, #root > * > *, #__next > * > *, main > * > *,
+                        body > * > * > *, #root > * > * > *, #__next > * > * > *, main > * > * > * {
+                            margin-top: 0 !important;
+                            padding-top: 0 !important;
+                        }
 
-                        /* ✅ 상단 여백 최소화: 뒤로가기 버튼과 텍스트 사이 간격 최소화 */
-                        header, nav, [role="banner"], [class*="Header"], [class*="header"], [class*="AppBar"], [class*="appbar"] {
+                        /* ✅ 상단 여백 완전 제거: 뒤로가기 버튼과 질문 텍스트 사이 간격 최소화 */
+                        header, nav, [role="banner"], [class*="Header"], [class*="header"], [class*="AppBar"], [class*="appbar"],
+                        [class*="Top"], [class*="top"], [class*="Nav"], [class*="nav"] {
                             padding-top: 0 !important;
                             margin-top: 0 !important;
                             padding-bottom: 0 !important;
@@ -183,31 +193,23 @@ internal object MyPlaceAddFix {
                         a[aria-label*="뒤로"], a[aria-label*="back"],
                         [class*="Back"], [class*="back"], 
                         [class*="Arrow"], [class*="arrow"],
-                        svg, path {
+                        button svg, a svg, [class*="Back"] svg, [class*="Arrow"] svg {
                             margin-top: 0 !important;
                             padding-top: 0 !important;
                             margin-bottom: 0 !important;
                             padding-bottom: 0 !important;
                         }
 
-                        /* ✅ 뒤로가기 버튼 바로 아래 요소들의 상단 여백 완전 제거 */
+                        /* ✅ 질문 텍스트 영역의 상단 여백 완전 제거 */
+                        main > *, #root > *, #__next > *,
                         main > *:first-child, #root > *:first-child, #__next > *:first-child,
-                        main > *:first-child > *:first-child, #root > *:first-child > *:first-child {
+                        main > *:first-child > *, #root > *:first-child > *, #__next > *:first-child > * {
                             margin-top: 0 !important;
                             padding-top: 0 !important;
                         }
-
-                        /* ✅ 질문 텍스트 영역의 상단 여백 제거 */
-                        h1, h2, h3, p, div {
-                            margin-top: 0 !important;
-                            padding-top: 0 !important;
-                        }
-
-                        /* ✅ 첫 번째 텍스트 요소의 여백 제거 */
-                        main h1:first-child, main h2:first-child, main h3:first-child,
-                        main p:first-child, main div:first-child,
-                        #root h1:first-child, #root h2:first-child, #root h3:first-child,
-                        #root p:first-child, #root div:first-child {
+                        
+                        /* ✅ 질문 텍스트(h1, h2 등)의 여백 완전 제거 및 표시 보장 */
+                        h1, h2, h3, p, div, span {
                             margin-top: 0 !important;
                             padding-top: 0 !important;
                         }
@@ -223,6 +225,28 @@ internal object MyPlaceAddFix {
                         svg, [class*="check"], [class*="Check"],
                         [class*="icon"], [class*="Icon"] {
                             margin-bottom: 16px !important;
+                        }
+                        
+                        /* ✅ 매니저/멤버 원형 아이콘 뒤의 회색 배경 제거 (CSS로 강제) */
+                        div[style*="border-radius: 50%"], div[style*="borderRadius: 50%"],
+                        div[style*="border-radius:50%"], div[style*="borderRadius:50%"],
+                        button[style*="border-radius: 50%"], button[style*="borderRadius: 50%"],
+                        *[style*="border-radius: 50%"], *[style*="borderRadius: 50%"] {
+                            background-color: transparent !important;
+                            background: transparent !important;
+                            background-image: none !important;
+                        }
+                        
+                        /* ✅ 회색 배경을 가진 원형 요소 강제 제거 */
+                        div[style*="background-color: rgb(245"], div[style*="background-color:rgb(245"],
+                        div[style*="background-color: rgb(240"], div[style*="background-color:rgb(240"],
+                        div[style*="background-color: rgb(229"], div[style*="background-color:rgb(229"],
+                        div[style*="background-color: rgb(243"], div[style*="background-color:rgb(243"],
+                        div[style*="background: rgb(245"], div[style*="background:rgb(245"],
+                        div[style*="background: rgb(240"], div[style*="background:rgb(240"] {
+                            background-color: transparent !important;
+                            background: transparent !important;
+                            background-image: none !important;
                         }
 
                         .db-force-content-pos {
@@ -306,85 +330,231 @@ internal object MyPlaceAddFix {
                   } catch(e) { return null; }
                 }
 
-                // ✅ 매니저/멤버 옵션 간격 조정 함수
+                // ✅ 매니저/멤버 옵션 간격 조정 함수 (더 강력한 버전)
                 function adjustOptionSpacing() {
                   try {
-                    // "매니저" 텍스트를 포함한 요소 찾기
-                    var allElements = document.querySelectorAll('div, p, span, h1, h2, h3');
-                    var managerOption = null;
-                    var memberOption = null;
-
-                    for (var i = 0; i < allElements.length; i++) {
-                      var text = (allElements[i].innerText || '').replace(/\s/g, '');
+                    // ✅ 간격 값 (여기서 조정하면 됨)
+                    // ✅ 매니저 체크 아이콘과 "기존 플레이스에 참여할 거에요." 사이 간격 확 줄임
+                    var SPACING_PX = 8;  // 48 -> 8 (간격 확 줄임)
+                    
+                    // ✅ 모든 텍스트 요소를 찾아서 "기존 플레이스에 참여할 거에요." 찾기
+                    var allTexts = document.querySelectorAll('p, div, span, h1, h2, h3, button, a, label');
+                    for (var t = 0; t < allTexts.length; t++) {
+                      var textEl = allTexts[t];
                       
-                      // 매니저 옵션 찾기
-                      if (text.indexOf('매니저') >= 0 || text.indexOf('Manager') >= 0) {
-                        if (!managerOption) {
-                          // 매니저 옵션의 루트 컨테이너 찾기
-                          var cur = allElements[i];
-                          for (var up = 0; up < 5; up++) {
-                            if (!cur || !cur.parentElement) break;
-                            cur = cur.parentElement;
-                            var rect = cur.getBoundingClientRect();
-                            // 적당한 크기의 컨테이너 찾기
-                            if (rect.width > window.innerWidth * 0.5 && rect.height > 100) {
-                              managerOption = cur;
-                              break;
-                            }
-                          }
+                      // ✅ 이미 처리한 요소는 스킵 (중복 처리 방지)
+                      if (textEl.__dangbun_member_spacing_applied__) continue;
+                      
+                      var textContent = (textEl.innerText || textEl.textContent || '').replace(/\s/g, '');
+                      
+                      // "기존 플레이스에 참여할 거에요." 텍스트 찾기
+                      if (textContent.indexOf('기존플레이스에참여할거에요') >= 0 || 
+                          textContent.indexOf('참여할거에요') >= 0 ||
+                          textContent.indexOf('기존플레이스') >= 0) {
+                        // 텍스트 요소와 모든 부모 요소에 간격 적용
+                        var current = textEl;
+                        for (var level = 0; level < 3 && current; level++) {
+                          current.style.setProperty('margin-top', SPACING_PX + 'px', 'important');
+                          current.style.setProperty('padding-top', SPACING_PX + 'px', 'important');
+                          current = current.parentElement;
                         }
-                      }
-
-                      // 멤버 옵션 찾기
-                      if (text.indexOf('기존플레이스에참여할거에요') >= 0 || text.indexOf('참여할거에요') >= 0) {
-                        if (!memberOption) {
-                          var cur2 = allElements[i];
-                          for (var up2 = 0; up2 < 5; up2++) {
-                            if (!cur2 || !cur2.parentElement) break;
-                            cur2 = cur2.parentElement;
-                            var rect2 = cur2.getBoundingClientRect();
-                            if (rect2.width > window.innerWidth * 0.5 && rect2.height > 100) {
-                              memberOption = cur2;
-                              break;
-                            }
-                          }
-                        }
+                        // ✅ 처리 완료 플래그 설정 (로그는 제거)
+                        textEl.__dangbun_member_spacing_applied__ = true;
                       }
                     }
-
-                    // 매니저 옵션: 원 아이콘과 체크 표시 사이 간격 넓히기
-                    if (managerOption) {
-                      var children = managerOption.querySelectorAll('div, svg, circle');
-                      for (var j = 0; j < children.length; j++) {
-                        var child = children[j];
-                        var rect = child.getBoundingClientRect();
-                        // 원형 아이콘 또는 체크 표시인 경우
-                        if (rect.width > 40 && rect.width < 150 && rect.height > 40 && rect.height < 150) {
-                          child.style.marginBottom = '20px';
+                    
+                    // ✅ 매니저 옵션의 체크 표시 찾기
+                    var allSvgs = document.querySelectorAll('svg, circle, path');
+                    for (var s = 0; s < allSvgs.length; s++) {
+                      var svgEl = allSvgs[s];
+                      
+                      // ✅ 이미 처리한 요소는 스킵 (중복 처리 방지)
+                      if (svgEl.__dangbun_manager_spacing_applied__) continue;
+                      
+                      var svgRect = svgEl.getBoundingClientRect();
+                      
+                      // 작은 크기의 SVG/원 요소 (체크 표시 후보)
+                      if (svgRect.width < 50 && svgRect.height < 50 && svgRect.width > 0 && svgRect.height > 0) {
+                        // 매니저 옵션 영역 내에 있는지 확인
+                        var checkParent = svgEl.parentElement;
+                        var isInManager = false;
+                        for (var cp = 0; cp < 6 && checkParent; cp++) {
+                          var parentText = (checkParent.innerText || checkParent.textContent || '').replace(/\s/g, '');
+                          if (parentText.indexOf('매니저') >= 0 || parentText.indexOf('Manager') >= 0) {
+                            isInManager = true;
+                            break;
+                          }
+                          checkParent = checkParent.parentElement;
                         }
-                      }
-                    }
-
-                    // 멤버 옵션: 체크 표시와 텍스트 사이 간격 넓히기
-                    if (memberOption) {
-                      var checkIcons = memberOption.querySelectorAll('svg, circle, path');
-                      for (var k = 0; k < checkIcons.length; k++) {
-                        checkIcons[k].style.marginBottom = '20px';
-                        // 체크 표시의 부모 요소도 간격 조정
-                        var parent = checkIcons[k].parentElement;
-                        if (parent) {
-                          parent.style.marginBottom = '20px';
+                        
+                        if (isInManager) {
+                          // 체크 표시 아래 간격 적용
+                          svgEl.style.setProperty('margin-bottom', SPACING_PX + 'px', 'important');
+                          svgEl.style.setProperty('padding-bottom', SPACING_PX + 'px', 'important');
+                          if (svgEl.parentElement) {
+                            svgEl.parentElement.style.setProperty('margin-bottom', SPACING_PX + 'px', 'important');
+                          }
+                          if (svgEl.parentElement && svgEl.parentElement.parentElement) {
+                            svgEl.parentElement.parentElement.style.setProperty('margin-bottom', SPACING_PX + 'px', 'important');
+                          }
+                          // ✅ 처리 완료 플래그 설정 (로그는 제거)
+                          svgEl.__dangbun_manager_spacing_applied__ = true;
                         }
                       }
                     }
                   } catch(e) {
-                    console.log('ADJUST_OPTION_SPACING_ERR', e);
+                    // 에러 로그도 제거 (너무 많이 출력됨)
                   }
                 }
 
                 // ==========================================
                 // [3] 메인 로직
                 // ==========================================
+                // ✅ 다른 화면의 스타일 완전 제거 (독립성 보장)
+                function cleanupOtherScreens() {
+                  try {
+                    // 다른 화면의 스타일 제거
+                    var otherStyleIds = [
+                      '__db_placemake1_top_inset_fix__',
+                      '__db_placemake2_top_inset_fix__',
+                      '__db_placemake3_top_inset_fix__',
+                      '__db_onboarding_top_inset_fix__',
+                      '__db_gray_topband_killer__'
+                    ];
+                    for (var i = 0; i < otherStyleIds.length; i++) {
+                      var styleEl = document.getElementById(otherStyleIds[i]);
+                      if (styleEl && styleEl.parentNode) {
+                        styleEl.parentNode.removeChild(styleEl);
+                      }
+                    }
+                    
+                    // 다른 화면의 클래스 제거
+                    var otherClasses = [
+                      'db-back-button-fixed',
+                      'db-next-button-fixed',
+                      'db-placemake2-content-raise'
+                    ];
+                    for (var j = 0; j < otherClasses.length; j++) {
+                      var elements = document.querySelectorAll('.' + otherClasses[j]);
+                      for (var k = 0; k < elements.length; k++) {
+                        try {
+                          elements[k].classList.remove(otherClasses[j]);
+                        } catch(e) {}
+                      }
+                    }
+                    
+                    // 다른 화면의 음수 margin 제거
+                    var mainElements = document.querySelectorAll('main, #root, #__next');
+                    for (var l = 0; l < mainElements.length; l++) {
+                      var el = mainElements[l];
+                      var computedStyle = window.getComputedStyle(el);
+                      var marginTop = computedStyle.marginTop;
+                      if (!isAddPlace() && marginTop && (marginTop.indexOf('-') >= 0 || parseFloat(marginTop) < -10)) {
+                        el.style.setProperty('margin-top', '0', 'important');
+                      }
+                    }
+                    
+                    // overflow, height 초기화
+                    var bodyElements = document.querySelectorAll('html, body');
+                    for (var m = 0; m < bodyElements.length; m++) {
+                      var elem = bodyElements[m];
+                      elem.style.setProperty('overflow-y', 'auto', 'important');
+                      elem.style.setProperty('overflow-x', 'auto', 'important');
+                      elem.style.setProperty('height', 'auto', 'important');
+                      elem.style.setProperty('max-height', 'none', 'important');
+                      elem.style.setProperty('touch-action', 'auto', 'important');
+                    }
+                  } catch(e) {}
+                }
+                
+                // ✅ 매니저/멤버 원형 아이콘 배경 처리 함수 (전역 스코프로 노출)
+                function removeGrayBackgroundBehindIcons() {
+                    try {
+                        // ✅ 모든 원형 요소를 찾아서 처리
+                        var allElements = document.querySelectorAll('*');
+                        for (var i = 0; i < allElements.length; i++) {
+                            var el = allElements[i];
+                            if (!el || !el.getBoundingClientRect) continue;
+                            
+                            var rect = el.getBoundingClientRect();
+                            if (rect.width <= 0 || rect.height <= 0) continue;
+                            
+                            var style = window.getComputedStyle(el);
+                            var bgColor = style.backgroundColor || '';
+                            var borderRadius = style.borderRadius || '';
+                            var width = rect.width;
+                            var height = rect.height;
+                            
+                            // 원형 요소인지 확인 (더 넓은 범위)
+                            var isCircular = (borderRadius.indexOf('50%') >= 0 || 
+                                             borderRadius.indexOf('999') >= 0 || 
+                                             borderRadius.indexOf('1000') >= 0 ||
+                                             (Math.abs(width - height) < 15 && width > 40 && width < 400));
+                            
+                            if (!isCircular || width < 40 || height < 40) continue;
+                            
+                            // 매니저/멤버 영역인지 확인
+                            var parentText = '';
+                            var current = el;
+                            for (var p = 0; p < 10 && current; p++) {
+                                var text = (current.innerText || current.textContent || '').replace(/\s/g, '');
+                                if (text.indexOf('매니저') >= 0 || text.indexOf('Manager') >= 0) {
+                                    parentText = 'manager';
+                                    break;
+                                }
+                                if (text.indexOf('멤버') >= 0 || text.indexOf('Member') >= 0) {
+                                    parentText = 'member';
+                                    break;
+                                }
+                                current = current.parentElement;
+                            }
+                            
+                            // 선택 상태 확인 (배경색이 이미 파란색/초록색이면 건드리지 않음)
+                            var bgColorLower = bgColor.toLowerCase();
+                            var isBlue = bgColorLower.indexOf('rgb(224') >= 0 || bgColorLower.indexOf('#e0e6ff') >= 0;
+                            var isGreen = bgColorLower.indexOf('rgb(224') >= 0 && bgColorLower.indexOf('245') >= 0 || 
+                                         bgColorLower.indexOf('#e0f5e0') >= 0;
+                            
+                            // 이미 선택된 색상이면 건드리지 않음
+                            if (isBlue || isGreen) continue;
+                            
+                            // 회색 배경 감지
+                            var isGray = (bgColorLower.indexOf('rgb(245') >= 0 || 
+                                         bgColorLower.indexOf('rgb(240') >= 0 || 
+                                         bgColorLower.indexOf('rgb(229') >= 0 ||
+                                         bgColorLower.indexOf('rgb(243') >= 0 ||
+                                         bgColorLower.indexOf('rgb(238') >= 0 ||
+                                         bgColorLower.indexOf('rgb(250') >= 0 ||
+                                         bgColorLower.indexOf('rgb(251') >= 0 ||
+                                         bgColorLower.indexOf('rgb(252') >= 0 ||
+                                         bgColorLower.indexOf('rgb(253') >= 0 ||
+                                         bgColorLower.indexOf('rgb(254') >= 0 ||
+                                         bgColorLower.indexOf('gray') >= 0 ||
+                                         bgColorLower.indexOf('grey') >= 0 ||
+                                         bgColorLower === 'rgb(245, 246, 248)' ||
+                                         bgColorLower === 'rgba(245, 246, 248, 1)' ||
+                                         bgColorLower === 'rgba(245, 246, 248, 0.5)' ||
+                                         bgColorLower === 'rgba(245, 246, 248, 0.8)');
+                            
+                            // 매니저 영역이면 회색 배경 제거, 멤버 영역이면 회색 배경으로 통일 (선택되지 않은 경우)
+                            if (parentText === 'manager' && isGray) {
+                                el.style.setProperty('background-color', 'transparent', 'important');
+                                el.style.setProperty('background', 'transparent', 'important');
+                                el.style.setProperty('background-image', 'none', 'important');
+                            } else if (parentText === 'member' && isGray) {
+                                el.style.setProperty('background-color', '#F5F6F8', 'important');
+                                el.style.setProperty('background', '#F5F6F8', 'important');
+                                el.style.setProperty('background-image', 'none', 'important');
+                            }
+                        }
+                    } catch(e) {
+                        // 에러 무시
+                    }
+                }
+                
+                // ✅ 전역 스코프에 노출 (외부에서 호출 가능하도록)
+                window.removeGrayBackgroundBehindIcons = removeGrayBackgroundBehindIcons;
+                
                 function manageLayout() {
                     var active = isAddPlace();
 
@@ -393,19 +563,323 @@ internal object MyPlaceAddFix {
                       removeScrollLock();
                       removeStyles();
                       forceRestoreScroll();
+                      return;
                     }
 
+                    // ✅ 다른 화면의 스타일 제거
+                    cleanupOtherScreens();
+                    
                     if (active) {
                         applyStyles();
                         installScrollLock();
 
+                        // ✅ 질문 텍스트를 직접 찾아서 여백 제거 및 표시 보장 (더 적극적으로)
+                        function removeTopSpacing() {
+                            var questionNodes = document.querySelectorAll('h1, h2, h3, p, div, span, *');
+                            for (var q = 0; q < questionNodes.length; q++) {
+                                var qEl = questionNodes[q];
+                                var qText = (qEl.innerText || qEl.textContent || '').replace(/\s/g, '');
+                                if (qText.indexOf('어떤목적으로사용하시나요') >= 0) {
+                                    // ✅ 질문 텍스트가 보이도록 보장
+                                    qEl.style.setProperty('display', 'block', 'important');
+                                    qEl.style.setProperty('visibility', 'visible', 'important');
+                                    qEl.style.setProperty('opacity', '1', 'important');
+                                    qEl.style.setProperty('height', 'auto', 'important');
+                                    qEl.style.setProperty('max-height', 'none', 'important');
+                                    
+                                    // 질문 텍스트와 모든 부모 요소의 여백 제거 (10단계까지)
+                                    var current = qEl;
+                                    for (var level = 0; level < 10 && current; level++) {
+                                        current.style.setProperty('margin-top', '0', 'important');
+                                        current.style.setProperty('padding-top', '0', 'important');
+                                        current.style.setProperty('margin-bottom', '0', 'important');
+                                        // 부모 요소도 보이도록 보장
+                                        current.style.setProperty('display', 'block', 'important');
+                                        current.style.setProperty('visibility', 'visible', 'important');
+                                        current = current.parentElement;
+                                    }
+                                }
+                            }
+                            
+                            // ✅ 모든 상단 요소들의 여백도 제거
+                            var topElements = document.querySelectorAll('header, nav, [role="banner"], [class*="Header"], [class*="header"]');
+                            for (var t = 0; t < topElements.length; t++) {
+                                var topEl = topElements[t];
+                                topEl.style.setProperty('margin-top', '0', 'important');
+                                topEl.style.setProperty('padding-top', '0', 'important');
+                                topEl.style.setProperty('margin-bottom', '0', 'important');
+                                topEl.style.setProperty('padding-bottom', '0', 'important');
+                                topEl.style.setProperty('min-height', 'auto', 'important');
+                                topEl.style.setProperty('height', 'auto', 'important');
+                            }
+                        }
+                        
+                        removeTopSpacing();
+                        setTimeout(removeTopSpacing, 50);
+                        setTimeout(removeTopSpacing, 150);
+                        setTimeout(removeTopSpacing, 300);
+
+                        // ✅ 질문 텍스트를 직접 찾아서 표시 보장
+                        var questionText = null;
+                        var allElements = document.querySelectorAll('h1, h2, h3, p, div, span, *');
+                        for (var qIdx = 0; qIdx < allElements.length; qIdx++) {
+                            var qEl = allElements[qIdx];
+                            var qText = (qEl.innerText || qEl.textContent || '').replace(/\s/g, '');
+                            if (qText.indexOf('어떤목적으로사용하시나요') >= 0) {
+                                questionText = qEl;
+                                // 질문 텍스트가 보이도록 강제
+                                qEl.style.setProperty('display', 'block', 'important');
+                                qEl.style.setProperty('visibility', 'visible', 'important');
+                                qEl.style.setProperty('opacity', '1', 'important');
+                                qEl.style.setProperty('height', 'auto', 'important');
+                                qEl.style.setProperty('max-height', 'none', 'important');
+                                qEl.style.setProperty('overflow', 'visible', 'important');
+                                
+                                // 부모 요소들도 보이도록 보장
+                                var parent = qEl.parentElement;
+                                for (var pLevel = 0; pLevel < 5 && parent; pLevel++) {
+                                    parent.style.setProperty('display', 'block', 'important');
+                                    parent.style.setProperty('visibility', 'visible', 'important');
+                                    parent.style.setProperty('overflow', 'visible', 'important');
+                                    parent = parent.parentElement;
+                                }
+                                break;
+                            }
+                        }
+
                         var content = findContentWrapper();
                         if (content && !content.classList.contains('db-force-content-pos')) {
                             content.classList.add('db-force-content-pos');
+                            // 콘텐츠 래퍼가 보이도록 보장
+                            content.style.setProperty('display', 'block', 'important');
+                            content.style.setProperty('visibility', 'visible', 'important');
+                            content.style.setProperty('opacity', '1', 'important');
+                            
+                            // 콘텐츠 래퍼와 모든 부모 요소의 여백도 제거 (10단계까지)
+                            var wrapper = content;
+                            for (var w = 0; w < 10 && wrapper; w++) {
+                                wrapper.style.setProperty('margin-top', '0', 'important');
+                                wrapper.style.setProperty('padding-top', '0', 'important');
+                                wrapper.style.setProperty('display', 'block', 'important');
+                                wrapper.style.setProperty('visibility', 'visible', 'important');
+                                wrapper = wrapper.parentElement;
+                            }
                         }
 
-                        // ✅ 매니저/멤버 옵션 간격 조정
+                        // ✅ 매니저/멤버 선택 상태에 따른 배경색 변경
+                        function applyManagerMemberBackgroundColors() {
+                            try {
+                                // 모든 원형 요소 찾기
+                                var allElements = document.querySelectorAll('*');
+                                for (var i = 0; i < allElements.length; i++) {
+                                    var el = allElements[i];
+                                    if (!el || !el.getBoundingClientRect) continue;
+                                    
+                                    var rect = el.getBoundingClientRect();
+                                    if (rect.width <= 0 || rect.height <= 0) continue;
+                                    
+                                    var style = window.getComputedStyle(el);
+                                    var borderRadius = style.borderRadius || '';
+                                    
+                                    // 원형 요소인지 확인
+                                    var isCircular = (borderRadius.indexOf('50%') >= 0 || 
+                                                     borderRadius.indexOf('999') >= 0 || 
+                                                     borderRadius.indexOf('1000') >= 0 ||
+                                                     (Math.abs(rect.width - rect.height) < 20 && rect.width > 40 && rect.width < 400));
+                                    
+                                    if (!isCircular || rect.width < 40 || rect.height < 40) continue;
+                                    
+                                    // 매니저/멤버 텍스트 찾기 (현재 요소와 자식 요소에서)
+                                    var text = (el.innerText || el.textContent || '').replace(/\s/g, '');
+                                    var isManager = (text.indexOf('매니저') >= 0 || text.indexOf('Manager') >= 0);
+                                    var isMember = (text.indexOf('멤버') >= 0 || text.indexOf('Member') >= 0);
+                                    
+                                    if (!isManager && !isMember) {
+                                        // 부모 요소에서도 확인
+                                        var parent = el.parentElement;
+                                        for (var p = 0; p < 3 && parent; p++) {
+                                            var parentText = (parent.innerText || parent.textContent || '').replace(/\s/g, '');
+                                            if (parentText.indexOf('매니저') >= 0 || parentText.indexOf('Manager') >= 0) {
+                                                isManager = true;
+                                                break;
+                                            }
+                                            if (parentText.indexOf('멤버') >= 0 || parentText.indexOf('Member') >= 0) {
+                                                isMember = true;
+                                                break;
+                                            }
+                                            parent = parent.parentElement;
+                                        }
+                                    }
+                                    
+                                    if (!isManager && !isMember) continue;
+                                    
+                                    // 선택 상태 확인 (체크마크, border 색상, 배경색 등)
+                                    var borderColor = style.borderColor || '';
+                                    var bgColor = style.backgroundColor || '';
+                                    var bgColorLower = bgColor.toLowerCase();
+                                    
+                                    // 하단에 체크마크가 있는지 확인
+                                    var hasCheckmarkBelow = false;
+                                    var nextSibling = el.nextElementSibling;
+                                    if (nextSibling) {
+                                        var checkmarkSvg = nextSibling.querySelector('svg, path[d*="M"], path[d*="m"]');
+                                        if (checkmarkSvg) {
+                                            var checkmarkRect = checkmarkSvg.getBoundingClientRect();
+                                            if (checkmarkRect.width > 0 && checkmarkRect.height > 0) {
+                                                hasCheckmarkBelow = true;
+                                            }
+                                        }
+                                    }
+                                    
+                                    // 내부에 체크마크가 있는지 확인
+                                    var hasCheckmarkInside = el.querySelector('svg, path[d*="M"], path[d*="m"]') !== null;
+                                    
+                                    // 선택 상태 판단
+                                    var isSelected = el.getAttribute('aria-selected') === 'true' ||
+                                                   el.classList.contains('selected') ||
+                                                   el.classList.contains('active') ||
+                                                   hasCheckmarkBelow ||
+                                                   hasCheckmarkInside ||
+                                                   borderColor.indexOf('rgb(59') >= 0 || // 파란색 border
+                                                   borderColor.indexOf('rgb(37') >= 0 ||
+                                                   borderColor.indexOf('rgb(96') >= 0 || // 파란색 border (다른 색상)
+                                                   bgColorLower.indexOf('#e0e6ff') >= 0 || // 이미 파란색 배경
+                                                   bgColorLower.indexOf('#e0f5e0') >= 0 || // 이미 초록색 배경
+                                                   bgColorLower.indexOf('rgb(224, 230, 255)') >= 0 || // 파란색 배경
+                                                   bgColorLower.indexOf('rgb(224, 245, 224)') >= 0; // 초록색 배경
+                                    
+                                    if (isSelected) {
+                                        if (isManager) {
+                                            // 매니저 선택 시: 밝은 파란색 배경 (#E0E6FF)
+                                            el.style.setProperty('background-color', '#E0E6FF', 'important');
+                                            el.style.setProperty('background', '#E0E6FF', 'important');
+                                            el.style.setProperty('border-color', '#C0CCFF', 'important');
+                                        } else if (isMember) {
+                                            // 멤버 선택 시: 밝은 초록색 배경 (#E0F5E0)
+                                            el.style.setProperty('background-color', '#E0F5E0', 'important');
+                                            el.style.setProperty('background', '#E0F5E0', 'important');
+                                            el.style.setProperty('border-color', '#B0E0B0', 'important');
+                                        }
+                                    } else {
+                                        // 선택되지 않은 경우 기본 배경 (투명)
+                                        var currentBg = bgColorLower;
+                                        // 이미 파란색이나 초록색이 아니면 투명으로 설정
+                                        if (currentBg.indexOf('#e0e6ff') < 0 && 
+                                            currentBg.indexOf('#e0f5e0') < 0 &&
+                                            currentBg.indexOf('rgb(224, 230, 255)') < 0 &&
+                                            currentBg.indexOf('rgb(224, 245, 224)') < 0) {
+                                            el.style.setProperty('background-color', 'transparent', 'important');
+                                            el.style.setProperty('background', 'transparent', 'important');
+                                        }
+                                    }
+                                }
+                            } catch(e) {
+                                console.log('MANAGER_MEMBER_BG_ERR', e && e.message);
+                            }
+                        }
+                        
+                        // ✅ 전역 함수 호출 (안전하게 호출)
+                        try {
+                          if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                            removeGrayBackgroundBehindIcons();
+                          } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                            window.removeGrayBackgroundBehindIcons();
+                          }
+                        } catch(e) {}
+                        
+                        setTimeout(function() {
+                          try {
+                            if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                              removeGrayBackgroundBehindIcons();
+                            } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                              window.removeGrayBackgroundBehindIcons();
+                            }
+                          } catch(e) {}
+                        }, 50);
+                        setTimeout(function() {
+                          try {
+                            if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                              removeGrayBackgroundBehindIcons();
+                            } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                              window.removeGrayBackgroundBehindIcons();
+                            }
+                          } catch(e) {}
+                        }, 100);
+                        setTimeout(function() {
+                          try {
+                            if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                              removeGrayBackgroundBehindIcons();
+                            } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                              window.removeGrayBackgroundBehindIcons();
+                            }
+                          } catch(e) {}
+                        }, 200);
+                        setTimeout(function() {
+                          try {
+                            if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                              removeGrayBackgroundBehindIcons();
+                            } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                              window.removeGrayBackgroundBehindIcons();
+                            }
+                          } catch(e) {}
+                        }, 300);
+                        setTimeout(function() {
+                          try {
+                            if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                              removeGrayBackgroundBehindIcons();
+                            } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                              window.removeGrayBackgroundBehindIcons();
+                            }
+                          } catch(e) {}
+                        }, 500);
+                        setTimeout(function() {
+                          try {
+                            if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                              removeGrayBackgroundBehindIcons();
+                            } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                              window.removeGrayBackgroundBehindIcons();
+                            }
+                          } catch(e) {}
+                        }, 800);
+                        
+                        // ✅ 매니저/멤버 선택 시 배경색 변경
+                        applyManagerMemberBackgroundColors();
+                        setTimeout(applyManagerMemberBackgroundColors, 50);
+                        setTimeout(applyManagerMemberBackgroundColors, 100);
+                        setTimeout(applyManagerMemberBackgroundColors, 200);
+                        setTimeout(applyManagerMemberBackgroundColors, 300);
+                        setTimeout(applyManagerMemberBackgroundColors, 500);
+                        
+                        // ✅ 클릭 이벤트 리스너 추가 (실시간 배경색 변경)
+                        if (!window.__db_manager_member_bg_listeners_added__) {
+                            window.__db_manager_member_bg_listeners_added__ = true;
+                            document.addEventListener('click', function(e) {
+                                setTimeout(function() {
+                                    applyManagerMemberBackgroundColors();
+                                }, 50);
+                            }, true);
+                            
+                            // MutationObserver로 DOM 변경 감지
+                            var bgObserver = new MutationObserver(function() {
+                                setTimeout(function() {
+                                    applyManagerMemberBackgroundColors();
+                                }, 100);
+                            });
+                            if (document.body) {
+                                bgObserver.observe(document.body, {
+                                    childList: true,
+                                    subtree: true,
+                                    attributes: true,
+                                    attributeFilter: ['class', 'style', 'aria-selected']
+                                });
+                            }
+                        }
+
+                        // ✅ 매니저/멤버 옵션 간격 조정 (여러 번 실행하여 확실히 적용)
                         adjustOptionSpacing();
+                        setTimeout(adjustOptionSpacing, 100);
+                        setTimeout(adjustOptionSpacing, 300);
+                        setTimeout(adjustOptionSpacing, 500);
 
                         var btn = findNextBtn();
                         if (btn) {
@@ -447,6 +921,64 @@ internal object MyPlaceAddFix {
                             }
                         }, 100);
                     });
+                }
+
+                // ✅ 상단 여백 제거도 주기적으로 실행
+                if (!window.__dangbun_remove_top_spacing_interval__) {
+                    window.__dangbun_remove_top_spacing_interval__ = setInterval(function() {
+                        if (isAddPlace()) {
+                            var questionNodes = document.querySelectorAll('h1, h2, h3, p, div, span, *');
+                            for (var q = 0; q < questionNodes.length; q++) {
+                                var qEl = questionNodes[q];
+                                var qText = (qEl.innerText || qEl.textContent || '').replace(/\s/g, '');
+                                if (qText.indexOf('어떤목적으로사용하시나요') >= 0) {
+                                    // ✅ 질문 텍스트가 보이도록 보장
+                                    qEl.style.setProperty('display', 'block', 'important');
+                                    qEl.style.setProperty('visibility', 'visible', 'important');
+                                    qEl.style.setProperty('opacity', '1', 'important');
+                                    
+                                    var current = qEl;
+                                    for (var level = 0; level < 10 && current; level++) {
+                                        current.style.setProperty('margin-top', '0', 'important');
+                                        current.style.setProperty('padding-top', '0', 'important');
+                                        current.style.setProperty('display', 'block', 'important');
+                                        current.style.setProperty('visibility', 'visible', 'important');
+                                        current = current.parentElement;
+                                    }
+                                }
+                            }
+                            var topElements = document.querySelectorAll('header, nav, [role="banner"], [class*="Header"], [class*="header"]');
+                            for (var t = 0; t < topElements.length; t++) {
+                                var topEl = topElements[t];
+                                topEl.style.setProperty('margin-top', '0', 'important');
+                                topEl.style.setProperty('padding-top', '0', 'important');
+                            }
+                        }
+                    }, 100);
+                }
+
+                // ✅ 간격 조정도 주기적으로 실행
+                if (!window.__dangbun_adjust_spacing_interval__) {
+                  window.__dangbun_adjust_spacing_interval__ = setInterval(function() {
+                    if (isAddPlace()) {
+                      adjustOptionSpacing();
+                    }
+                  }, 200);
+                }
+                
+                // ✅ 회색 배경 제거도 주기적으로 실행
+                if (!window.__dangbun_remove_gray_bg_interval__) {
+                  window.__dangbun_remove_gray_bg_interval__ = setInterval(function() {
+                    if (isAddPlace()) {
+                      try {
+                        if (typeof removeGrayBackgroundBehindIcons === 'function') {
+                          removeGrayBackgroundBehindIcons();
+                        } else if (typeof window.removeGrayBackgroundBehindIcons === 'function') {
+                          window.removeGrayBackgroundBehindIcons();
+                        }
+                      } catch(e) {}
+                    }
+                  }, 200);
                 }
 
                 setInterval(manageLayout, 100);

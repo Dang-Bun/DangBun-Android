@@ -34,7 +34,7 @@ internal object MyPlaceFix {
                         if (now - last < 1000) return;   // ✅ 1초 이내면 로그 스킵
                         window.__db_myplace_debug_last_ts__ = now;
 
-                        console.log('[MYPLACE_DEBUG] cards=', cards.length, 'path=', location.pathname);
+                        // console.log('[MYPLACE_DEBUG] cards=', cards.length, 'path=', location.pathname);  // 로그 제거
                       } catch(e) {}
                     })();
 
