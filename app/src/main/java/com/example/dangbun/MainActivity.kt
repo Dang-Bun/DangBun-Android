@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             DangbunWebViewScreen(
-                url = "https://dangbun-frontend-virid.vercel.app/onboarding",
+                url = "https://dangbun-frontend-virid.vercel.app/",
                 onClose = { finish() },
                 applyStatusBarPadding = true,
             )
